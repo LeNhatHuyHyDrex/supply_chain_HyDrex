@@ -1,4 +1,4 @@
-export const CONTRACT_ADDRESS = "0x9e65798d9C0F375DF3780772d5120D3dfa406B1f";
+export const CONTRACT_ADDRESS = "0xdEec868C61019eE6cc367AEeD883A5e27a9A0f99";
 
 export const CONTRACT_ABI = [
   {
@@ -50,6 +50,12 @@ export const CONTRACT_ABI = [
         "internalType": "int256",
         "name": "longitude",
         "type": "int256"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "condition",
+        "type": "string"
       }
     ],
     "name": "ProductAdded",
@@ -93,6 +99,12 @@ export const CONTRACT_ABI = [
         "internalType": "int256",
         "name": "longitude",
         "type": "int256"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "condition",
+        "type": "string"
       }
     ],
     "name": "ProductStatusUpdated",
@@ -246,6 +258,11 @@ export const CONTRACT_ABI = [
                 "internalType": "int256",
                 "name": "longitude",
                 "type": "int256"
+              },
+              {
+                "internalType": "string",
+                "name": "condition",
+                "type": "string"
               }
             ],
             "internalType": "struct SupplyChain.TrackingUpdate[]",
@@ -317,6 +334,11 @@ export const CONTRACT_ABI = [
             "internalType": "int256",
             "name": "longitude",
             "type": "int256"
+          },
+          {
+            "internalType": "string",
+            "name": "condition",
+            "type": "string"
           }
         ],
         "internalType": "struct SupplyChain.TrackingUpdate[]",
@@ -368,6 +390,11 @@ export const CONTRACT_ABI = [
             "internalType": "int256",
             "name": "longitude",
             "type": "int256"
+          },
+          {
+            "internalType": "string",
+            "name": "condition",
+            "type": "string"
           }
         ],
         "internalType": "struct SupplyChain.TrackingUpdate[]",
@@ -491,6 +518,11 @@ export const CONTRACT_ABI = [
         "internalType": "int256",
         "name": "_longitude",
         "type": "int256"
+      },
+      {
+        "internalType": "string",
+        "name": "_condition",
+        "type": "string"
       }
     ],
     "name": "updateProductStatus",

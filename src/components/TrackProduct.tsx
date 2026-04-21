@@ -5,6 +5,8 @@ import { useReadContract } from "wagmi";
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/config/contract";
 import QRCode from "react-qr-code";
 import dynamic from "next/dynamic";
+import QRScannerModal from "./QRScannerModal";
+import toast from "react-hot-toast";
 
 const MapTrace = dynamic(() => import("./MapTrace"), { ssr: false });
 
@@ -26,6 +28,7 @@ interface TrackProductProps {
 export default function TrackProduct({ initialId }: TrackProductProps = {}) {
   const [searchId, setSearchId] = useState(initialId || "");
   const [queryId, setQueryId] = useState<string | null>(initialId || null);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   useEffect(() => {
     if (initialId) {
@@ -56,7 +59,7 @@ export default function TrackProduct({ initialId }: TrackProductProps = {}) {
     bigint,
     string,
     string,
-    readonly { status: number; timestamp: bigint; updater: string; locationData: string; latitude: bigint; longitude: bigint }[]
+    readonly { status: number; timestamp: bigint; updater: string; locationData: string; latitude: bigint; longitude: bigint; condition: string }[]
   ] | undefined;
 
   return (
@@ -66,18 +69,28 @@ export default function TrackProduct({ initialId }: TrackProductProps = {}) {
       </h2>
 
       <form onSubmit={handleSearch} className="flex gap-3 mb-8">
-        <input
-          type="number"
-          value={searchId}
-          onChange={(e) => setSearchId(e.target.value)}
-          placeholder="Enter Product ID to track..."
-          className="flex-1 px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 text-white placeholder-gray-500 transition-all outline-none"
-        />
+        <div className="flex-1 flex gap-2">
+          <input
+            type="number"
+            value={searchId}
+            onChange={(e) => setSearchId(e.target.value)}
+            placeholder="Nhập ID sản phẩm..."
+            className="flex-1 px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 text-white placeholder-gray-500 transition-all outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => setIsScannerOpen(true)}
+            className="px-4 py-3 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-xl hover:bg-cyan-500/30 transition-all flex items-center gap-2 font-medium"
+          >
+            <span className="text-lg">📷</span>
+            Quét QR
+          </button>
+        </div>
         <button
           type="submit"
-          className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold rounded-xl shadow-lg shadow-cyan-500/30 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+          className="px-8 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold rounded-xl shadow-lg shadow-cyan-500/30 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
         >
-          Track
+          Truy xuất
         </button>
       </form>
 
@@ -162,9 +175,16 @@ export default function TrackProduct({ initialId }: TrackProductProps = {}) {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                           </svg>
                           <p className="text-sm text-gray-500 font-mono">
-                            Updated by: {truncateAddress(update.updater)}
+                            Người cập nhật: {truncateAddress(update.updater)}
                           </p>
                         </div>
+
+                        {update.condition && (
+                          <div className="mt-3 p-3 bg-white/5 border border-white/10 rounded-lg">
+                            <p className="text-xs text-gray-400 mb-1 uppercase font-bold tracking-wider">Tình trạng</p>
+                            <p className="text-sm text-gray-200 italic">"{update.condition}"</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -179,6 +199,17 @@ export default function TrackProduct({ initialId }: TrackProductProps = {}) {
          <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center text-amber-400">
          No product exists with this ID.
        </div>
+      )}
+      {isScannerOpen && (
+        <QRScannerModal
+          onScanSuccess={(val) => {
+            setSearchId(val);
+            setQueryId(val);
+            setIsScannerOpen(false);
+            toast.success("Đã truy xuất mã QR: " + val);
+          }}
+          onClose={() => setIsScannerOpen(false)}
+        />
       )}
     </div>
   );

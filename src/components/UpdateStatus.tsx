@@ -5,6 +5,7 @@ import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/config/contract";
 import toast from "react-hot-toast";
 import LocationPicker from "./LocationPicker";
+import QRScannerModal from "./QRScannerModal";
 
 export default function UpdateStatus() {
   const [id, setId] = useState("");
@@ -12,6 +13,8 @@ export default function UpdateStatus() {
   const [location, setLocation] = useState("");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
+  const [condition, setCondition] = useState("Tốt");
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   const { data: hash, isPending, writeContract } = useWriteContract();
 
@@ -28,6 +31,7 @@ export default function UpdateStatus() {
       setLocation("");
       setLatitude("");
       setLongitude("");
+      setCondition("Tốt");
     }
   }, [isConfirmed]);
 
@@ -42,7 +46,7 @@ export default function UpdateStatus() {
       address: CONTRACT_ADDRESS,
       abi: CONTRACT_ABI,
       functionName: "updateProductStatus",
-      args: [BigInt(id), parseInt(status, 10) as any, location, scaledLat, scaledLng],
+      args: [BigInt(id), parseInt(status, 10) as any, location, scaledLat, scaledLng, condition],
     });
   };
 
@@ -57,13 +61,37 @@ export default function UpdateStatus() {
           <label className="block text-sm font-medium text-gray-300 mb-1" htmlFor="updateProductId">
             Product ID
           </label>
-          <input
-            id="updateProductId"
-            type="number"
-            value={id}
-            onChange={(e) => setId(e.target.value)}
-            placeholder="e.g. 101"
-            className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 text-white placeholder-gray-500 transition-all outline-none"
+          <div className="flex gap-2">
+            <input
+              id="updateProductId"
+              type="number"
+              value={id}
+              onChange={(e) => setId(e.target.value)}
+              placeholder="Nhập ID sản phẩm..."
+              className="flex-1 px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 text-white placeholder-gray-500 transition-all outline-none"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setIsScannerOpen(true)}
+              className="px-4 py-3 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-xl hover:bg-purple-500/30 transition-all flex items-center gap-2 font-medium"
+            >
+              <span className="text-lg">📷</span>
+              Quét QR
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1" htmlFor="condition">
+            Ghi chú tình trạng
+          </label>
+          <textarea
+            id="condition"
+            value={condition}
+            onChange={(e) => setCondition(e.target.value)}
+            placeholder="e.g. Hàng nguyên vẹn, bao bì sạch sẽ..."
+            className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 text-white placeholder-gray-500 transition-all outline-none h-20 resize-none"
             required
           />
         </div>
@@ -132,6 +160,16 @@ export default function UpdateStatus() {
             </a>
           </div>
         </div>
+      )}
+      {isScannerOpen && (
+        <QRScannerModal
+          onScanSuccess={(val) => {
+            setId(val);
+            setIsScannerOpen(false);
+            toast.success("Đã quét thành công ID: " + val);
+          }}
+          onClose={() => setIsScannerOpen(false)}
+        />
       )}
     </div>
   );
