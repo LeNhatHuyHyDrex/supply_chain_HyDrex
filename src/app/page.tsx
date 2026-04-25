@@ -1,19 +1,17 @@
 "use client";
 
 import { useState } from 'react';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useDisconnect } from 'wagmi';
 import AddProduct from '@/components/AddProduct';
 import TrackProduct from '@/components/TrackProduct';
 import UpdateStatus from '@/components/UpdateStatus';
 import AdminPanel from '@/components/AdminPanel';
 import Dashboard from '@/components/Dashboard';
+import HeaderAuthControls from '@/components/HeaderAuthControls';
 import { Toaster } from 'react-hot-toast';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [trackId, setTrackId] = useState<string | null>(null);
-  const { disconnect } = useDisconnect();
 
   return (
     <div className="flex flex-col min-h-screen bg-[#0a0a0a] text-white selection:bg-cyan-500/30">
@@ -30,15 +28,7 @@ export default function Home() {
               SupplyChain
             </h1>
           </div>
-          <div className="flex items-center gap-4">
-            <ConnectButton />
-            <button 
-              onClick={() => disconnect()}
-              className="px-3 py-2 text-sm font-medium text-gray-300 bg-white/5 border border-white/10 rounded-lg hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/50 transition-all"
-            >
-              Disconnect
-            </button>
-          </div>
+          <HeaderAuthControls />
         </div>
       </header>
 
