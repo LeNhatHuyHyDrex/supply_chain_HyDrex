@@ -1,42 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAccount, useDisconnect } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import toast from "react-hot-toast";
+import { useUser } from "@/providers/UserProvider";
 
 export default function HeaderAuthControls() {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
+  const { user, refetchUser, requireOnboarding, setRequireOnboarding } = useUser();
   
-  const [displayName, setDisplayName] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [inputName, setInputName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    if (isConnected && address) {
-      fetchProfile(address);
-    } else {
-      setDisplayName(null);
-    }
-  }, [isConnected, address]);
-
-  const fetchProfile = async (wallet: string) => {
-    try {
-      const res = await fetch(`/api/user?wallet=${wallet}`);
-      if (res.ok) {
-        const data = await res.json();
-        setDisplayName(data.displayName);
-      } else if (res.status === 404) {
-        // Not found, open modal to onboard
-        setDisplayName(null);
-        setIsModalOpen(true);
-      }
-    } catch (error) {
-      console.error("Error fetching profile:", error);
-    }
-  };
 
   const handleSaveName = async () => {
     if (!inputName.trim()) {
@@ -56,9 +32,7 @@ export default function HeaderAuthControls() {
       });
 
       if (res.ok) {
-        const data = await res.json();
-        setDisplayName(data.displayName);
-        setIsModalOpen(false);
+        await refetchUser();
         toast.success("Đã cập nhật tên hiển thị!");
       } else {
         toast.error("Lỗi khi lưu tên hiển thị");
@@ -74,16 +48,17 @@ export default function HeaderAuthControls() {
   return (
     <>
       <div className="flex items-center gap-4">
-        {isConnected && displayName && (
+        {isConnected && user?.displayName && (
           <div className="px-4 py-2 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 rounded-xl flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
-            <span className="text-sm font-semibold text-cyan-50">{displayName}</span>
+            <span className="text-sm font-semibold text-cyan-50">{user.displayName}</span>
+            <span className="ml-2 px-2 py-0.5 bg-white/10 rounded text-[10px] font-bold text-gray-400 uppercase tracking-wider">{user.role}</span>
           </div>
         )}
         
-        {isConnected && !displayName && (
+        {isConnected && requireOnboarding && (
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => setRequireOnboarding(true)}
             className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-orange-500 to-red-500 rounded-xl hover:from-orange-400 hover:to-red-400 transition-all shadow-lg shadow-orange-500/20"
           >
             Set Display Name
@@ -102,7 +77,7 @@ export default function HeaderAuthControls() {
         )}
       </div>
 
-      {isModalOpen && (
+      {requireOnboarding && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#111] border border-white/10 rounded-2xl p-8 w-full max-w-md shadow-2xl">
             <h2 className="text-2xl font-bold mb-2 text-white">Welcome!</h2>
@@ -129,7 +104,7 @@ export default function HeaderAuthControls() {
             
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => setRequireOnboarding(false)}
                 className="px-5 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all"
                 disabled={isLoading}
               >

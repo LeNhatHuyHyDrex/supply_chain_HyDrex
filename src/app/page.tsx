@@ -6,12 +6,30 @@ import TrackProduct from '@/components/TrackProduct';
 import UpdateStatus from '@/components/UpdateStatus';
 import AdminPanel from '@/components/AdminPanel';
 import Dashboard from '@/components/Dashboard';
+import Storefront from '@/components/Storefront';
 import HeaderAuthControls from '@/components/HeaderAuthControls';
 import { Toaster } from 'react-hot-toast';
+import { useUser } from '@/providers/UserProvider';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('storefront');
   const [trackId, setTrackId] = useState<string | null>(null);
+  const { user } = useUser();
+
+  // Role resolution (default to CUSTOMER if unconnected)
+  const role = user?.role || "CUSTOMER";
+
+  // Access definitions
+  const accessMap = {
+    storefront: ['CUSTOMER', 'SHIPPER', 'SUPPLIER', 'ADMIN'],
+    consumer: ['CUSTOMER', 'SHIPPER', 'SUPPLIER', 'ADMIN'],
+    logistics: ['SHIPPER', 'SUPPLIER', 'ADMIN'],
+    producer: ['SUPPLIER', 'ADMIN'],
+    admin: ['ADMIN'],
+    dashboard: ['ADMIN'],
+  };
+
+  const hasAccess = (tab: keyof typeof accessMap) => accessMap[tab].includes(role);
 
   return (
     <div className="flex flex-col min-h-screen bg-[#0a0a0a] text-white selection:bg-cyan-500/30">
@@ -44,65 +62,98 @@ export default function Home() {
         
         <div className="flex justify-center mb-10">
           <div className="bg-white/5 p-1.5 rounded-2xl border border-white/10 inline-flex flex-wrap justify-center gap-1">
-            <button
-              onClick={() => setActiveTab('producer')}
-              className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'producer' 
-                  ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg' 
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              Producer Portal
-            </button>
-            <button
-              onClick={() => setActiveTab('logistics')}
-              className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'logistics' 
-                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg' 
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              Logistics & Retail
-            </button>
-            <button
-              onClick={() => setActiveTab('consumer')}
-              className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'consumer' 
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg' 
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              Consumer Traceability
-            </button>
-            <button
-              onClick={() => setActiveTab('admin')}
-              className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'admin' 
-                  ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg' 
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              Admin Panel
-            </button>
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'dashboard' 
-                  ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg' 
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              Global Dashboard
-            </button>
+            {hasAccess('storefront') && (
+              <button
+                onClick={() => setActiveTab('storefront')}
+                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  activeTab === 'storefront' 
+                    ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg' 
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                Storefront
+              </button>
+            )}
+            {hasAccess('producer') && (
+              <button
+                onClick={() => setActiveTab('producer')}
+                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  activeTab === 'producer' 
+                    ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg' 
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                Producer Portal
+              </button>
+            )}
+            {hasAccess('logistics') && (
+              <button
+                onClick={() => setActiveTab('logistics')}
+                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  activeTab === 'logistics' 
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg' 
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                Logistics & Retail
+              </button>
+            )}
+            {hasAccess('consumer') && (
+              <button
+                onClick={() => setActiveTab('consumer')}
+                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  activeTab === 'consumer' 
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg' 
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                Consumer Traceability
+              </button>
+            )}
+            {hasAccess('admin') && (
+              <button
+                onClick={() => setActiveTab('admin')}
+                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  activeTab === 'admin' 
+                    ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg' 
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                Admin Panel
+              </button>
+            )}
+            {hasAccess('dashboard') && (
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  activeTab === 'dashboard' 
+                    ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg' 
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                Global Dashboard
+              </button>
+            )}
           </div>
         </div>
 
         <div className="max-w-4xl mx-auto w-full">
-          {activeTab === 'producer' && <AddProduct />}
-          {activeTab === 'logistics' && <UpdateStatus />}
-          {activeTab === 'consumer' && <TrackProduct initialId={trackId} />}
-          {activeTab === 'admin' && <AdminPanel />}
-          {activeTab === 'dashboard' && <Dashboard onTrack={(id) => { setActiveTab('consumer'); setTrackId(id); }} />}
+          {!hasAccess(activeTab as keyof typeof accessMap) ? (
+            <div className="p-12 bg-black/40 border border-red-500/30 rounded-3xl text-center shadow-2xl shadow-red-500/10">
+              <div className="text-5xl mb-4">⛔</div>
+              <h3 className="text-2xl font-bold text-red-400 mb-2">Access Denied</h3>
+              <p className="text-gray-400">You do not have the required permissions ({role}) to view this portal.</p>
+            </div>
+          ) : (
+            <>
+              {activeTab === 'storefront' && <Storefront onTrace={(id) => { setActiveTab('consumer'); setTrackId(id); }} />}
+              {activeTab === 'producer' && <AddProduct />}
+              {activeTab === 'logistics' && <UpdateStatus />}
+              {activeTab === 'consumer' && <TrackProduct initialId={trackId} />}
+              {activeTab === 'admin' && <AdminPanel />}
+              {activeTab === 'dashboard' && <Dashboard onTrack={(id) => { setActiveTab('consumer'); setTrackId(id); }} />}
+            </>
+          )}
         </div>
       </main>
     </div>
