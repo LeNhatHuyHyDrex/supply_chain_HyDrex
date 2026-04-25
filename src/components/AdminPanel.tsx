@@ -1,116 +1,177 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/config/contract";
 import toast from "react-hot-toast";
 
+type Role = "ADMIN" | "SUPPLIER" | "SHIPPER" | "CUSTOMER";
+
+interface User {
+  walletAddress: string;
+  displayName: string;
+  role: Role;
+  createdAt: string;
+}
+
+const truncateAddress = (address: string) => {
+  if (!address) return "";
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+};
+
 export default function AdminPanel() {
-  const { address } = useAccount();
-  const [supplierAddress, setSupplierAddress] = useState("");
-  const [action, setAction] = useState<"add" | "remove" | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<Role>("ADMIN");
+  const [updatingWallet, setUpdatingWallet] = useState<string | null>(null);
 
-  const { data: owner } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: "owner",
-  });
+  const roles: Role[] = ["ADMIN", "SUPPLIER", "SHIPPER", "CUSTOMER"];
 
-  const { data: hash, isPending, writeContract } = useWriteContract();
-
-  const { isLoading: isConfirming, isSuccess: isConfirmed } =
-    useWaitForTransactionReceipt({
-      hash,
-    });
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/admin/users");
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(data);
+      } else {
+        toast.error("Failed to load users");
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      toast.error("An error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (isConfirmed) {
-      toast.success(`Supplier ${action === "add" ? "Added" : "Removed"} Successfully!`);
-      setSupplierAddress("");
-      setAction(null);
+    fetchUsers();
+  }, []);
+
+  const handleRoleChange = async (walletAddress: string, newRole: Role) => {
+    setUpdatingWallet(walletAddress);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ walletAddress, newRole }),
+      });
+
+      if (res.ok) {
+        toast.success("User role updated successfully");
+        fetchUsers(); // Refresh the list
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Failed to update role");
+      }
+    } catch (error) {
+      console.error("Error updating role:", error);
+      toast.error("An error occurred while updating");
+    } finally {
+      setUpdatingWallet(null);
     }
-  }, [isConfirmed, action]);
-
-  const handleAdd = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!supplierAddress || isPending || isConfirming) return;
-    setAction("add");
-    writeContract({
-      address: CONTRACT_ADDRESS,
-      abi: CONTRACT_ABI,
-      functionName: "addSupplier",
-      args: [supplierAddress as `0x${string}`],
-    });
   };
 
-  const handleRemove = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!supplierAddress || isPending || isConfirming) return;
-    setAction("remove");
-    writeContract({
-      address: CONTRACT_ADDRESS,
-      abi: CONTRACT_ABI,
-      functionName: "removeSupplier",
-      args: [supplierAddress as `0x${string}`],
-    });
-  };
-
-  const isOwner = owner === address;
-
-  if (!isOwner) {
-    return (
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl text-center">
-        <div className="text-red-400 mb-4">
-          <svg className="w-12 h-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-        </div>
-        <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
-        <p className="text-gray-400">You must be the contract owner to view this panel.</p>
-      </div>
-    );
-  }
+  const filteredUsers = users.filter((u) => u.role === activeTab);
 
   return (
-    <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl transition-all duration-300 hover:shadow-orange-500/10 h-full flex flex-col">
-      <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
-        Admin Panel: Manage Suppliers
-      </h2>
-      
-      <div className="space-y-5 flex-1 flex flex-col">
+    <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1" htmlFor="supplierAddress">
-            Supplier Ethereum Address
-          </label>
-          <input
-            id="supplierAddress"
-            type="text"
-            value={supplierAddress}
-            onChange={(e) => setSupplierAddress(e.target.value)}
-            placeholder="e.g. 0x123..."
-            className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 text-white placeholder-gray-500 transition-all outline-none"
-            required
-          />
+          <h2 className="text-3xl font-extrabold bg-gradient-to-r from-red-400 to-rose-500 bg-clip-text text-transparent">
+            User Management Dashboard
+          </h2>
+          <p className="text-gray-400 mt-2">Manage roles and permissions across the DApp.</p>
         </div>
-
-        <div className="flex gap-4 mt-auto pt-6">
-          <button
-            onClick={handleAdd}
-            disabled={isPending || isConfirming || !supplierAddress}
-            className="flex-1 py-3.5 px-4 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 text-white font-semibold rounded-xl shadow-lg shadow-orange-500/30 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-          >
-            {isPending && action === "add" ? "Confirming..." : isConfirming && action === "add" ? "Pending..." : "Add Supplier"}
-          </button>
-          
-          <button
-            onClick={handleRemove}
-            disabled={isPending || isConfirming || !supplierAddress}
-            className="flex-1 py-3.5 px-4 bg-black/40 border border-red-500/30 hover:bg-red-500/10 text-red-400 font-semibold rounded-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-          >
-            {isPending && action === "remove" ? "Confirming..." : isConfirming && action === "remove" ? "Pending..." : "Remove Supplier"}
-          </button>
+        <div className="px-4 py-2 bg-black/40 rounded-xl border border-white/10 flex gap-4">
+          <div className="text-center">
+            <p className="text-2xl font-bold text-white">{users.length}</p>
+            <p className="text-xs text-gray-500 uppercase tracking-wider">Total Users</p>
+          </div>
         </div>
       </div>
+
+      {/* Role Tabs */}
+      <div className="flex gap-2 mb-6 border-b border-white/10 pb-4 overflow-x-auto">
+        {roles.map((role) => {
+          const count = users.filter((u) => u.role === role).length;
+          return (
+            <button
+              key={role}
+              onClick={() => setActiveTab(role)}
+              className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
+                activeTab === role
+                  ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/20"
+                  : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              {role}
+              <span className={`px-2 py-0.5 rounded-md text-xs ${activeTab === role ? "bg-white/20" : "bg-black/50"}`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Data Table */}
+      {isLoading ? (
+        <div className="flex justify-center items-center py-20">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-cyan-400"></div>
+        </div>
+      ) : filteredUsers.length === 0 ? (
+        <div className="text-center py-16 bg-black/20 rounded-2xl border border-white/5">
+          <p className="text-gray-500">No users found with the {activeTab} role.</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-white/10 bg-black/40">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-white/5 border-b border-white/10">
+                <th className="p-4 text-sm font-semibold text-gray-300">Display Name</th>
+                <th className="p-4 text-sm font-semibold text-gray-300">Wallet Address</th>
+                <th className="p-4 text-sm font-semibold text-gray-300">Joined Date</th>
+                <th className="p-4 text-sm font-semibold text-gray-300 text-right">Actions (Role)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {filteredUsers.map((u) => (
+                <tr key={u.walletAddress} className="hover:bg-white/5 transition-colors">
+                  <td className="p-4">
+                    <div className="font-medium text-white flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-bold">
+                        {u.displayName.charAt(0).toUpperCase()}
+                      </div>
+                      {u.displayName}
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <span className="font-mono text-sm text-gray-400 bg-white/5 px-2 py-1 rounded-lg">
+                      {truncateAddress(u.walletAddress)}
+                    </span>
+                  </td>
+                  <td className="p-4 text-sm text-gray-400">
+                    {new Date(u.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="p-4 text-right">
+                    <select
+                      value={u.role}
+                      disabled={updatingWallet === u.walletAddress}
+                      onChange={(e) => handleRoleChange(u.walletAddress, e.target.value as Role)}
+                      className="px-3 py-1.5 bg-black/60 border border-white/10 rounded-lg text-sm font-medium text-gray-300 focus:outline-none focus:border-cyan-500 transition-colors disabled:opacity-50"
+                    >
+                      {roles.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
