@@ -15,51 +15,110 @@ export default function UpdateStatus() {
   const [longitude, setLongitude] = useState("");
   const [condition, setCondition] = useState("Tốt");
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [submittedId, setSubmittedId] = useState<string | null>(null);
+  const [submittedStatus, setSubmittedStatus] = useState<string | null>(null);
 
-  const { data: hash, isPending, writeContract } = useWriteContract();
+  const { data: hash, isPending, writeContractAsync } = useWriteContract();
 
   const { isLoading: isConfirming, isSuccess: isConfirmed } =
     useWaitForTransactionReceipt({
       hash,
     });
 
+  const resetForm = () => {
+    setId("");
+    setStatus("1");
+    setLocation("");
+    setLatitude("");
+    setLongitude("");
+    setCondition("Tốt");
+    setSubmittedId(null);
+    setSubmittedStatus(null);
+  };
+
   useEffect(() => {
-    if (isConfirmed) {
-      toast.success("Status Updated Successfully!");
-      setId("");
-      setStatus("1");
-      setLocation("");
-      setLatitude("");
-      setLongitude("");
-      setCondition("Tốt");
+    if (!isConfirmed || !submittedId) return;
+
+    toast.success("Status Updated on Blockchain!");
+
+    // If status was set to "Delivered" (2), auto-trigger inventory automation
+    if (submittedStatus === "2") {
+      const automate = async () => {
+        try {
+          const res = await fetch("/api/inventory/automate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ blockchainId: submittedId }),
+          });
+          const data = await res.json();
+
+          if (res.ok && data.success) {
+            toast.success(
+              `Delivery confirmed! ${data.quantity} items of "${data.productName}" automatically added to VKU Market Warehouse.`,
+              { duration: 5000, icon: "📦" }
+            );
+          } else if (data.alreadyDelivered) {
+            toast("This batch was already processed.", { icon: "ℹ️" });
+          } else if (!res.ok) {
+            // Batch not found — this blockchain ID might not have a batch record
+            // This is fine, not all blockchain products are batch-tracked
+            console.warn("Inventory automate skipped:", data.error);
+            toast("No batch record found for auto-inventory. Manual receive may be needed.", { icon: "ℹ️" });
+          }
+        } catch (err) {
+          console.error("Inventory automate failed:", err);
+          toast.error("Blockchain updated but inventory automation failed.");
+        }
+      };
+      automate();
     }
+
+    resetForm();
   }, [isConfirmed]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !status || !location || !latitude || !longitude || isPending || isConfirming) return;
 
-    const scaledLat = BigInt(Math.floor(Number(latitude) * 1000000));
-    const scaledLng = BigInt(Math.floor(Number(longitude) * 1000000));
+    // Save these for the post-confirm effect
+    setSubmittedId(id);
+    setSubmittedStatus(status);
 
-    writeContract({
-      address: CONTRACT_ADDRESS,
-      abi: CONTRACT_ABI,
-      functionName: "updateProductStatus",
-      args: [BigInt(id), parseInt(status, 10) as any, location, scaledLat, scaledLng, condition],
-    });
+    try {
+      const scaledLat = BigInt(Math.floor(Number(latitude) * 1000000));
+      const scaledLng = BigInt(Math.floor(Number(longitude) * 1000000));
+
+      await writeContractAsync({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: "updateProductStatus",
+        args: [BigInt(id), BigInt(status), location, scaledLat, scaledLng, condition],
+      });
+    } catch (error: any) {
+      console.error("Contract Call Failed:", error);
+      if (error?.message?.toLowerCase().includes("rejected") || error?.message?.toLowerCase().includes("denied")) {
+        toast.error("Transaction cancelled by user.");
+      } else {
+        toast.error("Transaction failed. Check console for details.");
+      }
+      setSubmittedId(null);
+      setSubmittedStatus(null);
+    }
   };
 
   return (
     <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl transition-all duration-300 hover:shadow-purple-500/10 h-full flex flex-col">
-      <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-        Logistics & Retail: Update Status
+      <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+        🚛 Logistics & Retail: Update Status
       </h2>
+      <p className="text-sm text-gray-500 mb-6">
+        When you set status to <span className="text-emerald-400 font-semibold">"Delivered"</span>, inventory is automatically updated.
+      </p>
       
       <form onSubmit={handleSubmit} className="space-y-5 flex-1 flex flex-col">
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-1" htmlFor="updateProductId">
-            Product ID
+            Product ID (Blockchain)
           </label>
           <div className="flex gap-2">
             <input
@@ -110,7 +169,7 @@ export default function UpdateStatus() {
             >
               <option value="0" className="bg-zinc-900">Created / Manufactured</option>
               <option value="1" className="bg-zinc-900">In Transit</option>
-              <option value="2" className="bg-zinc-900">Delivered</option>
+              <option value="2" className="bg-zinc-900">✅ Delivered (auto-updates inventory)</option>
             </select>
             <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,6 +177,11 @@ export default function UpdateStatus() {
               </svg>
             </div>
           </div>
+          {status === "2" && (
+            <p className="mt-2 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+              📦 Setting "Delivered" will auto-add the batch quantity to VKU Market warehouse inventory.
+            </p>
+          )}
         </div>
 
         <LocationPicker

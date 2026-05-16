@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Supply Chain DApp",
-  description: "Web3 Supply Chain tracking with Next.js and Solidity",
+  title: "VKU Market — Smart Inventory & Traceability",
+  description: "Blockchain-powered supply chain traceability and inventory management for VKU Market",
 };
 
 export default function RootLayout({

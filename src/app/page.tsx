@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import AddProduct from '@/components/AddProduct';
 import TrackProduct from '@/components/TrackProduct';
 import UpdateStatus from '@/components/UpdateStatus';
@@ -8,6 +9,7 @@ import AdminPanel from '@/components/AdminPanel';
 import Dashboard from '@/components/Dashboard';
 import Storefront from '@/components/Storefront';
 import HeaderAuthControls from '@/components/HeaderAuthControls';
+import InventoryManager from '@/components/InventoryManager';
 import { Toaster } from 'react-hot-toast';
 import { useUser } from '@/providers/UserProvider';
 
@@ -15,14 +17,25 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('storefront');
   const [trackId, setTrackId] = useState<string | null>(null);
   const { user } = useUser();
+  const searchParams = useSearchParams();
 
   // Role resolution (default to CUSTOMER if unconnected)
   const role = user?.role || "CUSTOMER";
+
+  // Handle QR code deep links: /?trace=123
+  useEffect(() => {
+    const traceId = searchParams.get('trace');
+    if (traceId) {
+      setTrackId(traceId);
+      setActiveTab('consumer');
+    }
+  }, [searchParams]);
 
   // Access definitions
   const accessMap = {
     storefront: ['CUSTOMER', 'SHIPPER', 'SUPPLIER', 'ADMIN'],
     consumer: ['CUSTOMER', 'SHIPPER', 'SUPPLIER', 'ADMIN'],
+    inventory: ['SUPPLIER', 'ADMIN'],
     logistics: ['SHIPPER', 'SUPPLIER', 'ADMIN'],
     producer: ['SUPPLIER', 'ADMIN'],
     admin: ['ADMIN'],
@@ -43,7 +56,7 @@ export default function Home() {
               </svg>
             </div>
             <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-              SupplyChain
+              VKU Market
             </h1>
           </div>
           <HeaderAuthControls />
@@ -53,10 +66,10 @@ export default function Home() {
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-12">
         <div className="text-center mb-10 space-y-4">
           <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">
-            Transparent Product Tracking
+            Smart Inventory & Traceability
           </h2>
           <p className="text-lg text-gray-400 max-w-2xl mx-auto">
-            Interact with our Sepolia testnet Smart Contract to add new products and trace their journey across the supply chain.
+            Blockchain-verified product origins with real-time inventory management for VKU Market.
           </p>
         </div>
         
@@ -71,31 +84,7 @@ export default function Home() {
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
                 }`}
               >
-                Storefront
-              </button>
-            )}
-            {hasAccess('producer') && (
-              <button
-                onClick={() => setActiveTab('producer')}
-                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  activeTab === 'producer' 
-                    ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg' 
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                Producer Portal
-              </button>
-            )}
-            {hasAccess('logistics') && (
-              <button
-                onClick={() => setActiveTab('logistics')}
-                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  activeTab === 'logistics' 
-                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg' 
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                Logistics & Retail
+                🏪 Product Catalog
               </button>
             )}
             {hasAccess('consumer') && (
@@ -107,7 +96,43 @@ export default function Home() {
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
                 }`}
               >
-                Consumer Traceability
+                🔍 Trace Origin
+              </button>
+            )}
+            {hasAccess('inventory') && (
+              <button
+                onClick={() => setActiveTab('inventory')}
+                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  activeTab === 'inventory' 
+                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' 
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                📦 Inventory
+              </button>
+            )}
+            {hasAccess('producer') && (
+              <button
+                onClick={() => setActiveTab('producer')}
+                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  activeTab === 'producer' 
+                    ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg' 
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                🌱 Producer Portal
+              </button>
+            )}
+            {hasAccess('logistics') && (
+              <button
+                onClick={() => setActiveTab('logistics')}
+                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  activeTab === 'logistics' 
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg' 
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                🚛 Logistics
               </button>
             )}
             {hasAccess('admin') && (
@@ -119,7 +144,7 @@ export default function Home() {
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
                 }`}
               >
-                Admin Panel
+                🛡️ Admin
               </button>
             )}
             {hasAccess('dashboard') && (
@@ -131,13 +156,13 @@ export default function Home() {
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
                 }`}
               >
-                Global Dashboard
+                📊 Dashboard
               </button>
             )}
           </div>
         </div>
 
-        <div className="max-w-4xl mx-auto w-full">
+        <div className="max-w-5xl mx-auto w-full">
           {!hasAccess(activeTab as keyof typeof accessMap) ? (
             <div className="p-12 bg-black/40 border border-red-500/30 rounded-3xl text-center shadow-2xl shadow-red-500/10">
               <div className="text-5xl mb-4">⛔</div>
@@ -147,9 +172,10 @@ export default function Home() {
           ) : (
             <>
               {activeTab === 'storefront' && <Storefront onTrace={(id) => { setActiveTab('consumer'); setTrackId(id); }} />}
+              {activeTab === 'consumer' && <TrackProduct initialId={trackId} />}
+              {activeTab === 'inventory' && <InventoryManager />}
               {activeTab === 'producer' && <AddProduct />}
               {activeTab === 'logistics' && <UpdateStatus />}
-              {activeTab === 'consumer' && <TrackProduct initialId={trackId} />}
               {activeTab === 'admin' && <AdminPanel />}
               {activeTab === 'dashboard' && <Dashboard onTrack={(id) => { setActiveTab('consumer'); setTrackId(id); }} />}
             </>

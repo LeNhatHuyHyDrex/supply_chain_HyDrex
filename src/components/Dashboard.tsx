@@ -14,6 +14,21 @@ export default function Dashboard({ onTrack }: DashboardProps) {
     functionName: "getAllProducts",
   });
 
+  const safeProducts = allProducts ? (allProducts as any[]).map(p => ({
+    id: p.id.toString(),
+    name: p.name,
+    origin: p.origin,
+    history: (p.history || []).map((h: any) => ({
+      status: Number(h.status),
+      timestamp: h.timestamp.toString(),
+      updater: h.updater,
+      locationData: h.locationData,
+      latitude: h.latitude.toString(),
+      longitude: h.longitude.toString(),
+      condition: h.condition
+    }))
+  })) : [];
+
   return (
     <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl transition-all duration-300 hover:shadow-orange-500/10 h-full flex flex-col">
       <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
@@ -29,7 +44,7 @@ export default function Dashboard({ onTrack }: DashboardProps) {
         <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400">
           Error loading products: {error?.message || "Unknown error"}
         </div>
-      ) : !allProducts || (allProducts as any[]).length === 0 ? (
+      ) : safeProducts.length === 0 ? (
         <div className="p-8 text-center text-gray-400 bg-black/20 rounded-xl border border-white/5">
           No products found in the supply chain.
         </div>
@@ -47,7 +62,7 @@ export default function Dashboard({ onTrack }: DashboardProps) {
             </thead>
             <tbody>
               {/* To display newest first, we reverse the array */}
-              {[...(allProducts as any[])].reverse().map((product, idx) => {
+              {[...safeProducts].reverse().map((product, idx) => {
                 const history = product.history || [];
                 const latestUpdate = history.length > 0 ? history[history.length - 1] : null;
                 const status = latestUpdate ? latestUpdate.status : 0;
@@ -58,13 +73,13 @@ export default function Dashboard({ onTrack }: DashboardProps) {
 
                 return (
                   <tr key={idx} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4 font-mono text-white">{product.id.toString()}</td>
+                    <td className="px-6 py-4 font-mono text-white">{product.id}</td>
                     <td className="px-6 py-4 font-medium text-white">{product.name}</td>
                     <td className="px-6 py-4">{product.origin}</td>
                     <td className="px-6 py-4">{statusBadge}</td>
                     <td className="px-6 py-4 text-right">
                       <button
-                        onClick={() => onTrack(product.id.toString())}
+                        onClick={() => onTrack(product.id)}
                         className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 text-white rounded-lg transition-colors text-xs font-semibold shadow-lg shadow-orange-500/20"
                       >
                         Track ↗

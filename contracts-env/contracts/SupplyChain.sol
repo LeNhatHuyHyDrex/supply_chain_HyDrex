@@ -18,6 +18,8 @@ contract SupplyChain {
         uint id;
         string name;
         string origin;
+        address currentOwner;
+        string ownerName;
         TrackingUpdate[] history;
     }
 
@@ -66,6 +68,8 @@ contract SupplyChain {
         p.id = _id;
         p.name = _name;
         p.origin = _origin;
+        p.currentOwner = msg.sender;
+        p.ownerName = "Origin";
         
         p.history.push(TrackingUpdate({
             status: Status.Created,
@@ -103,15 +107,25 @@ contract SupplyChain {
         return products[_id].history;
     }
 
+    function transferOwnership(uint _id, address _newOwner, string memory _ownerName) public onlyAuthorized {
+        Product storage p = products[_id];
+        require(p.history.length > 0, "Product does not exist");
+        
+        p.currentOwner = _newOwner;
+        p.ownerName = _ownerName;
+    }
+
     function getProduct(uint _id) public view returns (
         uint id,
         string memory name,
         string memory origin,
+        address currentOwner,
+        string memory ownerName,
         TrackingUpdate[] memory history
     ) {
         require(products[_id].history.length > 0, "Product does not exist");
         Product memory p = products[_id];
-        return (p.id, p.name, p.origin, p.history);
+        return (p.id, p.name, p.origin, p.currentOwner, p.ownerName, p.history);
     }
 
     function getAllProducts() public view returns (Product[] memory) {

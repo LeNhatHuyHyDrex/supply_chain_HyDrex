@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useReadContract } from "wagmi";
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/config/contract";
-import QRCode from "react-qr-code";
+import { QRCodeSVG } from "qrcode.react";
 import dynamic from "next/dynamic";
 import QRScannerModal from "./QRScannerModal";
 import UpdaterName from "./UpdaterName";
@@ -30,6 +30,8 @@ export default function TrackProduct({ initialId }: TrackProductProps = {}) {
   const [searchId, setSearchId] = useState(initialId || "");
   const [queryId, setQueryId] = useState<string | null>(initialId || null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [inventoryData, setInventoryData] = useState<{ inWarehouse: number; onDisplay: number; sold: number } | null>(null);
 
   useEffect(() => {
     if (initialId) {
@@ -37,6 +39,27 @@ export default function TrackProduct({ initialId }: TrackProductProps = {}) {
       setQueryId(initialId);
     }
   }, [initialId]);
+
+  useEffect(() => {
+    if (queryId) {
+      fetch(`/api/products/meta?productId=${queryId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.imageUrl) {
+            setImageUrl(data.imageUrl);
+          } else {
+            setImageUrl(null);
+          }
+        })
+        .catch(err => console.error("Error fetching image:", err));
+
+      // Fetch inventory status
+      fetch(`/api/inventory?productId=${queryId}`)
+        .then(res => res.json())
+        .then(data => setInventoryData(data))
+        .catch(err => console.error("Error fetching inventory:", err));
+    }
+  }, [queryId]);
 
   const { data, isError, isLoading, isFetching } = useReadContract({
     address: CONTRACT_ADDRESS,
@@ -110,24 +133,33 @@ export default function TrackProduct({ initialId }: TrackProductProps = {}) {
       {productData && productData[1] !== "" && (
         <div className="flex flex-col gap-8">
           <div className="flex flex-col md:flex-row gap-6">
-            <div className="flex-1 grid grid-cols-2 gap-4">
-              <div className="p-4 rounded-xl bg-black/20 border border-white/5">
-                <p className="text-sm text-gray-400 mb-1">Product ID</p>
-                <p className="text-lg font-semibold text-white">{productData[0].toString()}</p>
+            <div className="flex-1 flex flex-col gap-4">
+              <div className="w-full h-64 relative overflow-hidden rounded-xl bg-[#1A1A1A] border border-white/5 flex items-center justify-center">
+                {imageUrl ? (
+                  <img src={imageUrl} alt={productData[1]} className="w-full h-full object-cover shadow-2xl" />
+                ) : (
+                  <img src="https://placehold.co/800x400/1A1A1A/00E5FF?text=No+Image" alt="No image" className="w-full h-full object-cover opacity-50" />
+                )}
+                <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 text-xs font-bold text-white shadow-lg">
+                  ID: {productData[0].toString()}
+                </div>
               </div>
-              <div className="p-4 rounded-xl bg-black/20 border border-white/5">
-                <p className="text-sm text-gray-400 mb-1">Name</p>
-                <p className="text-lg font-semibold text-white">{productData[1]}</p>
-              </div>
-              <div className="p-4 rounded-xl bg-black/20 border border-white/5 col-span-2">
-                <p className="text-sm text-gray-400 mb-1">Origin</p>
-                <p className="text-lg font-semibold text-white">{productData[2]}</p>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl bg-black/20 border border-white/5">
+                  <p className="text-sm text-gray-400 mb-1">Name</p>
+                  <p className="text-lg font-semibold text-white">{productData[1]}</p>
+                </div>
+                <div className="p-4 rounded-xl bg-black/20 border border-white/5">
+                  <p className="text-sm text-gray-400 mb-1">Origin</p>
+                  <p className="text-lg font-semibold text-white">{productData[2]}</p>
+                </div>
               </div>
             </div>
             
             <div className="w-full md:w-56 shrink-0 flex flex-col items-center justify-center p-6 rounded-xl bg-black/20 border border-white/5">
               <div className="p-3 bg-white rounded-xl mb-4 shadow-xl">
-                 <QRCode value={productData[0].toString()} size={140} />
+                 <QRCodeSVG value={productData[0].toString()} size={140} />
               </div>
               <div className="flex items-center gap-2 text-cyan-400">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -137,6 +169,38 @@ export default function TrackProduct({ initialId }: TrackProductProps = {}) {
               </div>
             </div>
           </div>
+
+          {/* Inventory Status */}
+          {inventoryData && (
+            <div className="mt-4 p-4 rounded-xl border border-white/10 bg-black/20">
+              <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                <span>🏪</span> VKU Market Stock Status
+              </h3>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="p-3 bg-blue-500/5 border border-blue-500/10 rounded-xl text-center">
+                  <p className="text-[10px] text-blue-400 font-bold uppercase tracking-wider">Warehouse</p>
+                  <p className="text-2xl font-bold text-white mt-1">{inventoryData.inWarehouse}</p>
+                </div>
+                <div className="p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-xl text-center">
+                  <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">On Display</p>
+                  <p className="text-2xl font-bold text-white mt-1">{inventoryData.onDisplay}</p>
+                </div>
+                <div className="p-3 bg-purple-500/5 border border-purple-500/10 rounded-xl text-center">
+                  <p className="text-[10px] text-purple-400 font-bold uppercase tracking-wider">Sold</p>
+                  <p className="text-2xl font-bold text-white mt-1">{inventoryData.sold}</p>
+                </div>
+              </div>
+              <div className="mt-3 text-center">
+                <span className={`px-4 py-1.5 rounded-full text-sm font-bold ${
+                  (inventoryData.inWarehouse + inventoryData.onDisplay) > 0
+                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                    : "bg-red-500/10 text-red-400 border border-red-500/20"
+                }`}>
+                  {(inventoryData.inWarehouse + inventoryData.onDisplay) > 0 ? "✅ In Stock" : "❌ Sold Out"}
+                </span>
+              </div>
+            </div>
+          )}
 
           <div className="mt-4">
             <h3 className="text-xl font-bold text-white mb-6">Journey Map</h3>

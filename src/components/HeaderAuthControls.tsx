@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAccount, useDisconnect } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import toast from "react-hot-toast";
@@ -13,6 +13,11 @@ export default function HeaderAuthControls() {
   
   const [inputName, setInputName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleSaveName = async () => {
     if (!inputName.trim()) {
@@ -27,7 +32,7 @@ export default function HeaderAuthControls() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           walletAddress: address,
-          displayName: inputName.trim()
+          displayName: inputName.trim(),
         })
       });
 
@@ -65,7 +70,7 @@ export default function HeaderAuthControls() {
           </button>
         )}
 
-        <ConnectButton />
+        <ConnectButton showBalance={false} />
         
         {isConnected && (
           <button 

@@ -14,3 +14,36 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
 }
+
+model ProductMeta {
+  id        String  @id @default(uuid())
+  productId String  @unique
+  imageUrl  String?
+}
+
+model ProductTemplate {
+  id        String        @id @default(uuid())
+  name      String
+  origin    String
+  imageUrl  String        @db.Text
+  inventory Inventory?
+  batches   BatchRecord[]
+  createdAt DateTime      @default(now())
+}
+
+model BatchRecord {
+  blockchainId String          @id @unique
+  templateId   String
+  template     ProductTemplate @relation(fields: [templateId], references: [id])
+  quantity     Int
+  isDelivered  Boolean         @default(false)
+}
+
+model Inventory {
+  templateId String          @id @unique
+  template   ProductTemplate @relation(fields: [templateId], references: [id])
+  inWarehouse Int            @default(0)
+  onDisplay   Int            @default(0)
+  sold        Int            @default(0)
+  updatedAt   DateTime       @updatedAt
+}
