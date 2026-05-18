@@ -51,36 +51,53 @@ export async function POST(request: Request) {
   }
 }
 
-// PATCH /api/templates — update a template's image
-// body: { templateId, newImageUrl }
+// PATCH /api/templates — update template image OR price
+// body: { templateId, newImageUrl? } OR { templateId, price? }
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { templateId, newImageUrl } = body;
+    const { templateId, newImageUrl, price } = body;
 
-    if (!templateId || !newImageUrl) {
-      return NextResponse.json({ error: 'templateId and newImageUrl are required' }, { status: 400 });
+    if (!templateId) {
+      return NextResponse.json({ error: 'templateId is required' }, { status: 400 });
     }
 
-    // Update the template image
+    const updateData: any = {};
+
+    // Handle image update
+    if (newImageUrl !== undefined) {
+      updateData.imageUrl = newImageUrl;
+    }
+
+    // Handle price update
+    if (price !== undefined) {
+      updateData.price = price === null || price === '' ? null : parseFloat(price);
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'Nothing to update. Provide newImageUrl or price.' }, { status: 400 });
+    }
+
     const template = await prisma.productTemplate.update({
       where: { id: templateId },
-      data: { imageUrl: newImageUrl },
+      data: updateData,
       include: { batches: true },
     });
 
-    // Also update all linked ProductMeta entries for each batch's blockchain ID
-    for (const batch of template.batches) {
-      await prisma.productMeta.upsert({
-        where: { productId: batch.blockchainId },
-        update: { imageUrl: newImageUrl },
-        create: { productId: batch.blockchainId, imageUrl: newImageUrl },
-      });
+    // If image was updated, also update all linked ProductMeta entries
+    if (newImageUrl) {
+      for (const batch of template.batches) {
+        await prisma.productMeta.upsert({
+          where: { productId: batch.blockchainId },
+          update: { imageUrl: newImageUrl },
+          create: { productId: batch.blockchainId, imageUrl: newImageUrl },
+        });
+      }
     }
 
     return NextResponse.json(template);
   } catch (error: any) {
-    console.error('Error updating template image:', error);
+    console.error('Error updating template:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

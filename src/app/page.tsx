@@ -1,187 +1,456 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
-import AddProduct from '@/components/AddProduct';
-import TrackProduct from '@/components/TrackProduct';
-import UpdateStatus from '@/components/UpdateStatus';
-import AdminPanel from '@/components/AdminPanel';
-import Dashboard from '@/components/Dashboard';
-import Storefront from '@/components/Storefront';
-import HeaderAuthControls from '@/components/HeaderAuthControls';
-import InventoryManager from '@/components/InventoryManager';
-import { Toaster } from 'react-hot-toast';
-import { useUser } from '@/providers/UserProvider';
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronDown, ChevronUp, Leaf, ShieldCheck, Truck, Globe, Package } from "lucide-react";
+import { Toaster } from "react-hot-toast";
+import gsap from "gsap";
 
-export default function Home() {
-  const [activeTab, setActiveTab] = useState('storefront');
-  const [trackId, setTrackId] = useState<string | null>(null);
-  const { user } = useUser();
-  const searchParams = useSearchParams();
+// ─── App Shell Components ─────────────────────────────────────────────────────
+import MasterHeader, { type ViewKey } from "@/components/MasterHeader";
+import GlowingGlassCard from "@/components/GlowingGlassCard";
+import Storefront from "@/components/Storefront";
+import TrackProduct from "@/components/TrackProduct";
+import InventoryManager from "@/components/InventoryManager";
+import OrderManager from "@/components/OrderManager";
+import AddProduct from "@/components/AddProduct";
+import UpdateStatus from "@/components/UpdateStatus";
+import AdminPanel from "@/components/AdminPanel";
+import Dashboard from "@/components/Dashboard";
+import CartDrawer from "@/components/CartDrawer";
+import { useUser } from "@/providers/UserProvider";
 
-  // Role resolution (default to CUSTOMER if unconnected)
-  const role = user?.role || "CUSTOMER";
+// ─── VIDEO SOURCE ─────────────────────────────────────────────────────────────
+const VIDEO_SRC =
+  "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260511_080827_a9e5ad52-b6ee-4e79-b393-d936f179cfd7.mp4";
 
-  // Handle QR code deep links: /?trace=123
+// ─── FAQ DATA ─────────────────────────────────────────────────────────────────
+const FAQ_DATA = [
+  { q: "How does blockchain verify my fruit?", a: "Every product is registered on-chain with a unique ID. Each status update (harvest → transit → delivery) is an immutable transaction, giving you a tamper-proof record of origin and handling." },
+  { q: "What wallets do you support?", a: "We support MetaMask, Brave Wallet, Coinbase Wallet, and any WalletConnect-compatible wallet on the Ethereum Sepolia testnet." },
+  { q: "Is my data private?", a: "Only supply chain data is stored on-chain. Personal info like delivery addresses are stored in a secure database and never exposed to the blockchain." },
+  { q: "How does inventory automation work?", a: "When logistics marks a batch as 'Delivered', our system auto-updates warehouse stock. Staff can then move items to display shelves and record sales." },
+];
+
+// ─── Animation Variants ───────────────────────────────────────────────────────
+const viewTransition = {
+  initial: { opacity: 0, y: 20, filter: "blur(6px)" },
+  animate: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] } },
+  exit: { opacity: 0, y: -10, filter: "blur(4px)", transition: { duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] } },
+};
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 40 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] } },
+};
+
+// ─── BlurText ─────────────────────────────────────────────────────────────────
+function BlurText({ text }: { text: string }) {
+  return (
+    <span>
+      {text.split("").map((char, i) => (
+        <span key={i} className="blur-text-char" style={{ animationDelay: `${i * 0.03 + 0.5}s` }}>
+          {char === " " ? "\u00A0" : char}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+// ─── LogoMark (footer) ────────────────────────────────────────────────────────
+function LogoMark({ className = "" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="url(#lgft)" /><path d="M16 6L22 10V18L16 22L10 18V10L16 6Z" stroke="white" strokeWidth="1.5" strokeLinejoin="round" fill="none" /><path d="M16 6V22M10 10L22 18M22 10L10 18" stroke="white" strokeWidth="1.2" strokeLinecap="round" opacity="0.6" /><defs><linearGradient id="lgft" x1="0" y1="0" x2="32" y2="32"><stop stopColor="#059669" /><stop offset="1" stopColor="#10b981" /></linearGradient></defs></svg>
+  );
+}
+
+// ─── FAQ Item ─────────────────────────────────────────────────────────────────
+function FaqItem({ item, isOpen, toggle }: { item: { q: string; a: string }; isOpen: boolean; toggle: () => void }) {
+  return (
+    <div className="border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden transition-colors hover:border-slate-300 dark:hover:border-white/20">
+      <button onClick={toggle} className="w-full flex items-center justify-between p-5 text-left">
+        <span className="font-body font-semibold text-sm pr-4 text-slate-900 dark:text-white">{item.q}</span>
+        {isOpen ? <ChevronUp className="w-4 h-4 shrink-0 text-fruit-emerald" /> : <ChevronDown className="w-4 h-4 shrink-0 text-slate-400 dark:text-white/40" />}
+      </button>
+      <div className="faq-content" style={{ maxHeight: isOpen ? "200px" : "0px", opacity: isOpen ? 1 : 0 }}>
+        <p className="px-5 pb-5 text-sm text-slate-600 dark:text-white/60 font-body leading-relaxed">{item.a}</p>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HOME VIEW
+// ═══════════════════════════════════════════════════════════════════════════════
+function HomeView({ onNavigate }: { onNavigate: (view: ViewKey) => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const framesRef = useRef<ImageData[]>([]);
+  const frameIndexRef = useRef(0);
+  const directionRef = useRef<1 | -1>(1);
+  const rafRef = useRef<number>(0);
+  const targetX = useRef(0);
+  const targetY = useRef(0);
+  const currentX = useRef(0);
+  const currentY = useRef(0);
+
+  const [framesReady, setFramesReady] = useState(false);
+  const [heroVisible, setHeroVisible] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
+
+  // Frame Capture
   useEffect(() => {
-    const traceId = searchParams.get('trace');
-    if (traceId) {
-      setTrackId(traceId);
-      setActiveTab('consumer');
-    }
-  }, [searchParams]);
+    const video = videoRef.current;
+    if (!video) return;
+    const offscreen = document.createElement("canvas");
+    const offCtx = offscreen.getContext("2d", { willReadFrequently: true });
+    if (!offCtx) return;
+    let capturing = false;
+    const captureFrame = () => {
+      if (!capturing) return;
+      if (video.paused || video.ended) { if (framesRef.current.length > 0) setFramesReady(true); return; }
+      offCtx.drawImage(video, 0, 0, offscreen.width, offscreen.height);
+      framesRef.current.push(offCtx.getImageData(0, 0, offscreen.width, offscreen.height));
+      requestAnimationFrame(captureFrame);
+    };
+    const onCanPlay = () => { offscreen.width = video.videoWidth; offscreen.height = video.videoHeight; capturing = true; video.play().catch(() => { }); };
+    const onPlay = () => { captureFrame(); };
+    const onEnded = () => { capturing = false; if (framesRef.current.length > 0) setFramesReady(true); };
+    video.addEventListener("canplaythrough", onCanPlay);
+    video.addEventListener("play", onPlay);
+    video.addEventListener("ended", onEnded);
+    return () => { capturing = false; video.removeEventListener("canplaythrough", onCanPlay); video.removeEventListener("play", onPlay); video.removeEventListener("ended", onEnded); };
+  }, []);
 
-  // Access definitions
-  const accessMap = {
-    storefront: ['CUSTOMER', 'SHIPPER', 'SUPPLIER', 'ADMIN'],
-    consumer: ['CUSTOMER', 'SHIPPER', 'SUPPLIER', 'ADMIN'],
-    inventory: ['SUPPLIER', 'ADMIN'],
-    logistics: ['SHIPPER', 'SUPPLIER', 'ADMIN'],
-    producer: ['SUPPLIER', 'ADMIN'],
-    admin: ['ADMIN'],
-    dashboard: ['ADMIN'],
-  };
+  // Boomerang Render
+  useEffect(() => {
+    if (!framesReady || framesRef.current.length === 0) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const frames = framesRef.current;
+    canvas.width = frames[0].width; canvas.height = frames[0].height;
+    const renderLoop = () => {
+      const frame = frames[frameIndexRef.current];
+      if (frame) ctx.putImageData(frame, 0, 0);
+      frameIndexRef.current += directionRef.current;
+      if (frameIndexRef.current >= frames.length - 1) { directionRef.current = -1; frameIndexRef.current = frames.length - 1; }
+      else if (frameIndexRef.current <= 0) { directionRef.current = 1; frameIndexRef.current = 0; }
+      rafRef.current = requestAnimationFrame(renderLoop);
+    };
+    rafRef.current = requestAnimationFrame(renderLoop);
+    return () => { cancelAnimationFrame(rafRef.current); };
+  }, [framesReady]);
 
-  const hasAccess = (tab: keyof typeof accessMap) => accessMap[tab].includes(role);
+  // Parallax
+  useEffect(() => {
+    const container = containerRef.current;
+    const canvas = canvasRef.current;
+    if (!container || !canvas) return;
+    const strength = 20; const lerp = 0.06;
+    const onMouseMove = (e: MouseEvent) => {
+      const rect = container.getBoundingClientRect();
+      targetX.current = ((e.clientX - rect.left - rect.width / 2) / rect.width) * strength;
+      targetY.current = ((e.clientY - rect.top - rect.height / 2) / rect.height) * strength;
+    };
+    const animateParallax = () => {
+      currentX.current += (targetX.current - currentX.current) * lerp;
+      currentY.current += (targetY.current - currentY.current) * lerp;
+      gsap.set(canvas, { x: currentX.current, y: currentY.current });
+      requestAnimationFrame(animateParallax);
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    const raf = requestAnimationFrame(animateParallax);
+    return () => { window.removeEventListener("mousemove", onMouseMove); cancelAnimationFrame(raf); };
+  }, []);
+
+  useEffect(() => { const t = setTimeout(() => setHeroVisible(true), 300); return () => clearTimeout(t); }, []);
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#0a0a0a] text-white selection:bg-cyan-500/30">
-      <Toaster position="top-right" toastOptions={{ style: { background: '#1a1a1a', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' } }} />
-      <header className="border-b border-white/10 bg-black/50 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-              VKU Market
-            </h1>
-          </div>
-          <HeaderAuthControls />
-        </div>
-      </header>
+    <>
+      {/* ═══ SECTION 1: CINEMATIC HERO ══════════════════════════════════════ */}
+      <div ref={containerRef} className="relative w-full h-screen overflow-hidden bg-black -mt-[72px]">
+        <video ref={videoRef} src={VIDEO_SRC} muted playsInline crossOrigin="anonymous" preload="auto"
+          className={`absolute inset-0 w-full h-full object-cover ${framesReady ? "hidden" : "opacity-60"}`} />
+        <canvas ref={canvasRef}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${framesReady ? "opacity-60" : "opacity-0"}`}
+          style={{ objectFit: "cover" }} />
+        <div className="absolute inset-0 bg-white/90 dark:bg-transparent dark:bg-gradient-to-b dark:from-black/40 dark:via-black/20 dark:to-black/70 z-[1]" />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-12">
-        <div className="text-center mb-10 space-y-4">
-          <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">
-            Smart Inventory & Traceability
-          </h2>
-          <p className="text-lg text-gray-400 max-w-2xl mx-auto">
-            Blockchain-verified product origins with real-time inventory management for VKU Market.
+        <div className={`absolute inset-0 z-[5] flex flex-col items-center justify-center transition-all duration-1000 ${heroVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+          <h1 className="font-heading text-slate-900 dark:text-white text-center select-none" style={{ fontSize: "clamp(2rem, 5vw, 4.5rem)", lineHeight: 1.1, letterSpacing: "-0.03em" }}>
+            <BlurText text="Fresh From the Farm," /><br /><BlurText text="Verified on Chain" />
+          </h1>
+          <p className="text-slate-600 dark:text-white/50 text-lg md:text-xl mt-6 font-light tracking-wide max-w-xl text-center font-body">
+            Blockchain-Verified Fruit Marketplace
+          </p>
+          <div className="flex items-center gap-4 mt-10">
+            <button onClick={() => onNavigate("storefront")}
+              className="px-8 py-3.5 bg-fruit-emerald text-white font-bold text-sm rounded-full shadow-2xl shadow-fruit-emerald/30 hover:shadow-fruit-emerald/50 transition-all hover:scale-105 active:scale-95">
+              Start Shopping
+            </button>
+            <button onClick={() => onNavigate("consumer")}
+              className="px-8 py-3.5 text-slate-900 dark:text-white font-semibold text-sm hover:scale-105 transition-all bg-white/50 dark:bg-black/30 border border-slate-300 dark:border-white/10 rounded-full">
+              View Traceability
+            </button>
+          </div>
+        </div>
+
+        <div className={`absolute bottom-8 left-0 right-0 z-[5] px-8 flex items-end justify-between transition-all duration-1000 delay-500 ${heroVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
+          <p className="text-slate-500 dark:text-white/40 text-xs leading-relaxed font-body max-w-xs">Every fruit traced from farm to table.<br />Powered by Ethereum Smart Contracts.</p>
+          <div className="flex items-center gap-3 text-slate-500 dark:text-white/30 text-xs font-body">
+            <span className="flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5" /> Verified</span>
+            <span className="flex items-center gap-1"><Truck className="w-3.5 h-3.5" /> Tracked</span>
+            <span className="flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> Decentralized</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ SECTION 2: WHY VKU MARKET? (Glowing Glass Cards on Fruit BG) ═══ */}
+      <section className="relative overflow-hidden">
+        {/* Fruit background */}
+        <div className="absolute inset-0 z-0">
+          <img src="/background/Blackground2.jpg" alt="" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-white/90 dark:bg-black/80 backdrop-blur-sm dark:backdrop-blur-none" />
+        </div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-6 py-32">
+          <motion.div className="text-center mb-20" initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}>
+            <span className="badge badge-success mb-4 inline-flex"><Leaf className="w-3 h-3" /> Why Choose Us</span>
+            <h2 className="font-heading text-4xl md:text-5xl tracking-tight text-slate-900 dark:text-white drop-shadow-lg">Why VKU Market?</h2>
+            <p className="text-slate-600 dark:text-white/50 font-body mt-3 max-w-lg mx-auto">
+              Three pillars that make our blockchain marketplace stand apart from the rest.
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <GlowingGlassCard
+              icon={<ShieldCheck className="w-7 h-7" />}
+              title="On-Chain Traceability"
+              description="Every harvest is verified on the Sepolia blockchain. Immutable, transparent, and trustworthy — from the orchard to your table."
+              glowGradient="linear-gradient(137deg, #10B981 0%, #06b6d4 100%)"
+              delay={0}
+            />
+            <GlowingGlassCard
+              icon={<Leaf className="w-7 h-7" />}
+              title="Peak Freshness"
+              description="From farm to table in hours, not days. Our integrated logistics engine ensures every item arrives at peak ripeness."
+              glowGradient="linear-gradient(137deg, #F59E0B 0%, #F87171 100%)"
+              delay={0.15}
+            />
+            <GlowingGlassCard
+              icon={<Package className="w-7 h-7" />}
+              title="Smart Inventory"
+              description="Real-time stock syncing via automated smart contracts. Warehouse, shelf, and sales data — all connected on one dashboard."
+              glowGradient="linear-gradient(137deg, #8B5CF6 0%, #EC4899 100%)"
+              delay={0.3}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ SECTION 3: STOREFRONT (Scroll Reveal) ══════════════════════════ */}
+      <section className="relative w-full py-24 bg-cover bg-center bg-no-repeat bg-fixed" style={{ backgroundImage: "url('/background/Blackground4..jpg')" }}>
+        <div className="absolute inset-0 bg-white/95 dark:bg-[#0A0A0B]/70 backdrop-blur-[2px] z-0 transition-colors duration-500"></div>
+        <motion.div className="relative z-10 max-w-7xl mx-auto px-4 md:px-8" initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}>
+          <div className="text-center mb-16">
+            <span className="badge badge-success mb-4 inline-flex"><Leaf className="w-3 h-3" /> Fresh Collection</span>
+            <h2 className="font-heading text-4xl md:text-5xl tracking-tight text-slate-900 dark:text-white">Product Catalog</h2>
+            <p className="text-slate-500 dark:text-slate-400 font-body mt-3 max-w-lg mx-auto">
+              Farm-fresh produce, verified on the Ethereum blockchain. Every item is traceable from origin to shelf.
+            </p>
+          </div>
+          <Storefront onTrace={(id) => onNavigate("consumer")} />
+        </motion.div>
+      </section>
+
+      {/* ═══ SECTION 4: CTA + FAQ (on Fruit BG) ════════════════════════════ */}
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 z-0">
+          <img src="/background/Blackground3.jpg" alt="" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-white/90 dark:bg-black/80 backdrop-blur-sm dark:backdrop-blur-none" />
+        </div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-6 py-24">
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* CTA Card */}
+              <div className="animated-gradient-bg relative overflow-hidden min-h-[420px] flex flex-col justify-end p-10">
+                <div className="absolute inset-0 bg-white/80 dark:bg-black/50 z-0" />
+                <div className="relative z-10">
+                  <h3 className="font-heading text-4xl text-slate-900 dark:text-white mb-4 leading-tight">
+                    Trace Every Step<br />Without Borders
+                  </h3>
+                  <p className="text-slate-700 dark:text-white/70 font-body text-sm mb-8 max-w-sm">
+                    From Vietnamese orchards to your doorstep — every transaction is immutably recorded on the Ethereum blockchain.
+                  </p>
+                  <button onClick={() => onNavigate("storefront")}
+                    className="inline-flex px-8 py-3.5 bg-slate-900 text-white dark:bg-white dark:text-black font-bold text-sm rounded-full hover:scale-105 transition-all shadow-2xl">
+                    Start Shopping →
+                  </button>
+                </div>
+              </div>
+
+              {/* FAQ */}
+              <div className="flex flex-col justify-center">
+                <h3 className="font-heading text-3xl mb-6 text-slate-900 dark:text-white">Frequently Asked</h3>
+                <div className="space-y-3">
+                  {FAQ_DATA.map((item, i) => (
+                    <FaqItem key={i} item={item} isOpen={openFaq === i} toggle={() => setOpenFaq(openFaq === i ? null : i)} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ═══ SECTION 5: FOOTER ══════════════════════════════════════════════ */}
+      <footer className="border-t border-[var(--border)] bg-[var(--background)] transition-colors">
+        <div className="max-w-7xl mx-auto px-6 py-16">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
+            <div className="md:col-span-2">
+              <div className="flex items-center gap-2.5 mb-4"><LogoMark className="w-8 h-8" /><span className="font-heading text-xl">VKU Market</span></div>
+              <p className="text-sm text-[var(--muted)] font-body max-w-sm leading-relaxed">
+                Blockchain-verified fruit marketplace with real-time traceability and inventory management. Built for VKU — Vietnam-Korea University.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-body font-bold text-xs uppercase tracking-wider text-[var(--muted)] mb-4">Platform</h4>
+              <div className="space-y-2.5">
+                {([["Shop", "storefront"], ["Trace Products", "consumer"], ["Inventory", "inventory"], ["Orders", "orders"]] as [string, ViewKey][]).map(([label, view]) => (
+                  <button key={view} onClick={() => onNavigate(view)} className="block text-sm font-body hover:text-fruit-emerald transition-colors text-[var(--muted)]">{label}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h4 className="font-body font-bold text-xs uppercase tracking-wider text-[var(--muted)] mb-4">Technology</h4>
+              <div className="space-y-2.5">
+                {["Ethereum Sepolia", "Next.js 16", "Wagmi + RainbowKit", "Prisma ORM"].map(t => (
+                  <p key={t} className="text-sm font-body text-[var(--muted)]">{t}</p>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="pt-8 border-t border-[var(--border)]">
+            <p className="text-xs text-[var(--muted)] font-body text-center leading-relaxed">
+              All rights reserved. © 2026. Designed and Developed by Lê Nhật Huy (23IT102) & Nguyễn Thị Thùy Tiến (23IT273) - Vietnam-Korea University (VKU). Contact: hydrex.129@gmail.com
+            </p>
+          </div>
+        </div>
+      </footer>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DASHBOARD WRAPPER
+// ═══════════════════════════════════════════════════════════════════════════════
+function DashboardShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-[calc(100vh-72px)] pt-6 bg-slate-50 dark:bg-[#0A0A0B] transition-colors">
+      <div className="max-w-6xl mx-auto px-6 pb-16">{children}</div>
+      <footer className="border-t border-[var(--border)] transition-colors">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <p className="text-xs text-[var(--muted)] font-body text-center leading-relaxed">
+            All rights reserved. © 2026. Designed and Developed by Lê Nhật Huy (23IT102) & Nguyễn Thị Thùy Tiến (23IT273) - Vietnam-Korea University (VKU). Contact: hydrex.129@gmail.com
           </p>
         </div>
-        
-        <div className="flex justify-center mb-10">
-          <div className="bg-white/5 p-1.5 rounded-2xl border border-white/10 inline-flex flex-wrap justify-center gap-1">
-            {hasAccess('storefront') && (
-              <button
-                onClick={() => setActiveTab('storefront')}
-                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  activeTab === 'storefront' 
-                    ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg' 
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                🏪 Product Catalog
-              </button>
-            )}
-            {hasAccess('consumer') && (
-              <button
-                onClick={() => setActiveTab('consumer')}
-                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  activeTab === 'consumer' 
-                    ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg' 
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                🔍 Trace Origin
-              </button>
-            )}
-            {hasAccess('inventory') && (
-              <button
-                onClick={() => setActiveTab('inventory')}
-                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  activeTab === 'inventory' 
-                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' 
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                📦 Inventory
-              </button>
-            )}
-            {hasAccess('producer') && (
-              <button
-                onClick={() => setActiveTab('producer')}
-                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  activeTab === 'producer' 
-                    ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg' 
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                🌱 Producer Portal
-              </button>
-            )}
-            {hasAccess('logistics') && (
-              <button
-                onClick={() => setActiveTab('logistics')}
-                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  activeTab === 'logistics' 
-                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg' 
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                🚛 Logistics
-              </button>
-            )}
-            {hasAccess('admin') && (
-              <button
-                onClick={() => setActiveTab('admin')}
-                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  activeTab === 'admin' 
-                    ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg' 
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                🛡️ Admin
-              </button>
-            )}
-            {hasAccess('dashboard') && (
-              <button
-                onClick={() => setActiveTab('dashboard')}
-                className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  activeTab === 'dashboard' 
-                    ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg' 
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                📊 Dashboard
-              </button>
-            )}
-          </div>
-        </div>
+      </footer>
+    </div>
+  );
+}
 
-        <div className="max-w-5xl mx-auto w-full">
-          {!hasAccess(activeTab as keyof typeof accessMap) ? (
-            <div className="p-12 bg-black/40 border border-red-500/30 rounded-3xl text-center shadow-2xl shadow-red-500/10">
-              <div className="text-5xl mb-4">⛔</div>
-              <h3 className="text-2xl font-bold text-red-400 mb-2">Access Denied</h3>
-              <p className="text-gray-400">You do not have the required permissions ({role}) to view this portal.</p>
-            </div>
-          ) : (
-            <>
-              {activeTab === 'storefront' && <Storefront onTrace={(id) => { setActiveTab('consumer'); setTrackId(id); }} />}
-              {activeTab === 'consumer' && <TrackProduct initialId={trackId} />}
-              {activeTab === 'inventory' && <InventoryManager />}
-              {activeTab === 'producer' && <AddProduct />}
-              {activeTab === 'logistics' && <UpdateStatus />}
-              {activeTab === 'admin' && <AdminPanel />}
-              {activeTab === 'dashboard' && <Dashboard onTrack={(id) => { setActiveTab('consumer'); setTrackId(id); }} />}
-            </>
-          )}
-        </div>
-      </main>
+// ═══════════════════════════════════════════════════════════════════════════════
+// APP SHELL
+// ═══════════════════════════════════════════════════════════════════════════════
+export default function AppShell() {
+  const [activeView, setActiveView] = useState<ViewKey>("home");
+  const [trackId, setTrackId] = useState<string | null>(null);
+  const [scrolled, setScrolled] = useState(false);
+  const { user } = useUser();
+  const role = user?.role || "CUSTOMER";
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 100);
+    };
+    window.addEventListener("scroll", handleScroll);
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const isHeroMode = activeView === "home" && !scrolled;
+
+  const handleNavigate = (view: ViewKey) => {
+    setActiveView(view);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const hasAccess = (view: ViewKey): boolean => {
+    if (view === "home" || view === "storefront" || view === "consumer") return true;
+    const map: Record<string, string[]> = {
+      inventory: ["SUPPLIER", "ADMIN"], orders: ["ADMIN", "SUPPLIER"], producer: ["SUPPLIER", "ADMIN"],
+      logistics: ["SHIPPER", "SUPPLIER", "ADMIN"], admin: ["ADMIN"], dashboard: ["ADMIN"],
+    };
+    return map[view]?.includes(role) ?? false;
+  };
+
+  return (
+    <div className="bg-slate-50 text-slate-900 dark:bg-[#0A0A0B] dark:text-white font-body selection:bg-fruit-emerald/20 transition-colors duration-300 min-h-screen">
+      <Toaster position="top-right" toastOptions={{
+        className: "font-body",
+        style: { background: "var(--card-bg)", color: "var(--foreground)", border: "1px solid var(--card-border)", backdropFilter: "blur(12px)", fontFamily: "'Inter', sans-serif" },
+      }} />
+
+      <MasterHeader activeView={activeView} onNavigate={handleNavigate} isHeroMode={isHeroMode} />
+      {!isHeroMode && <div className="h-[72px]" />}
+
+      <AnimatePresence mode="wait">
+        {activeView === "home" && (
+          <motion.div key="home" {...viewTransition}><HomeView onNavigate={handleNavigate} /></motion.div>
+        )}
+        {activeView === "storefront" && (
+          <motion.div key="storefront" {...viewTransition}><DashboardShell><Storefront onTrace={(id) => { setTrackId(id); handleNavigate("consumer"); }} /></DashboardShell></motion.div>
+        )}
+        {activeView === "consumer" && (
+          <motion.div key="consumer" {...viewTransition}><DashboardShell><TrackProduct initialId={trackId} /></DashboardShell></motion.div>
+        )}
+        {activeView === "inventory" && hasAccess("inventory") && (
+          <motion.div key="inventory" {...viewTransition}><DashboardShell><InventoryManager /></DashboardShell></motion.div>
+        )}
+        {activeView === "orders" && hasAccess("orders") && (
+          <motion.div key="orders" {...viewTransition}><DashboardShell><OrderManager /></DashboardShell></motion.div>
+        )}
+        {activeView === "producer" && hasAccess("producer") && (
+          <motion.div key="producer" {...viewTransition}><DashboardShell><AddProduct /></DashboardShell></motion.div>
+        )}
+        {activeView === "logistics" && hasAccess("logistics") && (
+          <motion.div key="logistics" {...viewTransition}><DashboardShell><UpdateStatus /></DashboardShell></motion.div>
+        )}
+        {activeView === "admin" && hasAccess("admin") && (
+          <motion.div key="admin" {...viewTransition}><DashboardShell><AdminPanel /></DashboardShell></motion.div>
+        )}
+        {activeView === "dashboard" && hasAccess("dashboard") && (
+          <motion.div key="dashboard" {...viewTransition}><DashboardShell><Dashboard onTrack={(id) => { setTrackId(id); handleNavigate("consumer"); }} /></DashboardShell></motion.div>
+        )}
+        {activeView !== "home" && !hasAccess(activeView) && (
+          <motion.div key="denied" {...viewTransition}>
+            <DashboardShell>
+              <div className="glass-card p-12 text-center">
+                <div className="text-5xl mb-4">⛔</div>
+                <h3 className="font-heading text-2xl mb-2">Access Denied</h3>
+                <p className="text-[var(--muted)] font-body">You do not have the required permissions ({role}) to view this section.</p>
+                <button onClick={() => handleNavigate("home")} className="btn-primary mt-6">Back to Home</button>
+              </div>
+            </DashboardShell>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <CartDrawer />
     </div>
   );
 }

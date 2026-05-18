@@ -26,6 +26,7 @@ model ProductTemplate {
   name      String
   origin    String
   imageUrl  String        @db.Text
+  price     Float?
   inventory Inventory?
   batches   BatchRecord[]
   createdAt DateTime      @default(now())
@@ -46,4 +47,16 @@ model Inventory {
   onDisplay   Int            @default(0)
   sold        Int            @default(0)
   updatedAt   DateTime       @updatedAt
+}
+
+model Order {
+  id            String   @id @default(uuid())
+  buyerWallet   String?
+  customerName  String
+  address       String   @db.Text
+  items         Json
+  totalAmount   Float
+  paymentMethod String
+  status        String   @default("PENDING_APPROVAL")
+  createdAt     DateTime @default(now())
 }

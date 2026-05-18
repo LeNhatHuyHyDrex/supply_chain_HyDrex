@@ -65,7 +65,7 @@ export default function OrderTracking() {
     return (
       <div className="p-12 bg-white/5 border border-white/10 rounded-3xl text-center">
         <div className="text-6xl mb-4">🔗</div>
-        <h3 className="text-2xl font-bold text-white mb-2">Connect Your Wallet</h3>
+        <h3 className="text-2xl font-bold mb-2">Connect Your Wallet</h3>
         <p className="text-gray-400">Please connect your wallet to view your orders.</p>
       </div>
     );
@@ -75,7 +75,7 @@ export default function OrderTracking() {
     return (
       <div className="p-12 bg-white/5 border border-white/10 rounded-3xl text-center">
         <div className="text-6xl mb-4">📭</div>
-        <h3 className="text-2xl font-bold text-white mb-2">No Orders Yet</h3>
+        <h3 className="text-2xl font-bold mb-2">No Orders Yet</h3>
         <p className="text-gray-400">Browse the Storefront and place your first order!</p>
       </div>
     );
@@ -84,14 +84,14 @@ export default function OrderTracking() {
   return (
     <div className="space-y-6">
       {/* Default Shipping Address Banner */}
-      {user.shippingAddress ? (
+      {(user as any).shippingAddress ? (
         <div className="p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center shrink-0">
             <span className="text-lg">📍</span>
           </div>
           <div className="flex-1">
             <p className="text-xs text-cyan-400 font-bold uppercase tracking-wider mb-0.5">Default Shipping Address</p>
-            <p className="text-sm text-white">{user.shippingAddress}</p>
+            <p className="text-sm">{(user as any).shippingAddress}</p>
           </div>
         </div>
       ) : (
@@ -121,7 +121,7 @@ export default function OrderTracking() {
           try { productList = JSON.parse(order.productIds); } catch { productList = []; }
 
           return (
-            <div key={order.id} className="bg-black/40 border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 hover:border-blue-500/30">
+            <div key={order.id} className="bg-[var(--surface)] border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 hover:border-blue-500/30">
               {/* Order Header */}
               <button
                 onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
@@ -130,7 +130,7 @@ export default function OrderTracking() {
                 <div className="flex items-center gap-4">
                   <div className="text-3xl">{statusIcon}</div>
                   <div>
-                    <h3 className="font-bold text-white text-lg">Order #{order.id.slice(0, 8)}</h3>
+                    <h3 className="font-bold text-lg">Order #{order.id.slice(0, 8)}</h3>
                     <p className="text-sm text-gray-500 mt-0.5">
                       {new Date(order.createdAt).toLocaleDateString("vi-VN", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </p>
@@ -153,7 +153,7 @@ export default function OrderTracking() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="p-4 bg-white/5 rounded-xl border border-white/5">
                       <p className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1">Destination</p>
-                      <p className="text-sm text-white">{order.shippingAddress}</p>
+                      <p className="text-sm">{order.shippingAddress}</p>
                       {order.buyerLat && order.buyerLng && (
                         <p className="text-xs font-mono text-gray-500 mt-1">
                           📍 {order.buyerLat.toFixed(4)}, {order.buyerLng.toFixed(4)}

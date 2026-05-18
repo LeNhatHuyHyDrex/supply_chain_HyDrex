@@ -2,56 +2,56 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 export interface CartItem {
-  id: string;
+  templateId: string;
   name: string;
   imageUrl: string | null;
   origin: string;
+  price: number;
   quantity: number;
 }
 
 interface CartState {
   items: CartItem[];
   isDrawerOpen: boolean;
-  pendingNavigation: string | null;
   addToCart: (product: Omit<CartItem, 'quantity'>) => void;
-  updateQuantity: (id: string, amount: number) => void;
-  removeFromCart: (id: string) => void;
+  updateQuantity: (templateId: string, amount: number) => void;
+  removeFromCart: (templateId: string) => void;
   clearCart: () => void;
   toggleDrawer: () => void;
   setDrawerOpen: (isOpen: boolean) => void;
-  setPendingNavigation: (tab: string | null) => void;
+  totalAmount: () => number;
+  totalItems: () => number;
 }
 
 export const useCartStore = create<CartState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       items: [],
       isDrawerOpen: false,
-      pendingNavigation: null,
 
       addToCart: (product) =>
         set((state) => {
-          const existingItem = state.items.find((item) => item.id === product.id);
+          const existingItem = state.items.find((item) => item.templateId === product.templateId);
           if (existingItem) {
             return {
               items: state.items.map((item) =>
-                item.id === product.id
+                item.templateId === product.templateId
                   ? { ...item, quantity: item.quantity + 1 }
                   : item
               ),
-              isDrawerOpen: true, // auto open on add
+              isDrawerOpen: true,
             };
           }
           return {
             items: [...state.items, { ...product, quantity: 1 }],
-            isDrawerOpen: true, // auto open on add
+            isDrawerOpen: true,
           };
         }),
 
-      updateQuantity: (id, amount) =>
+      updateQuantity: (templateId, amount) =>
         set((state) => {
           const updatedItems = state.items.map((item) => {
-            if (item.id === id) {
+            if (item.templateId === templateId) {
               return { ...item, quantity: item.quantity + amount };
             }
             return item;
@@ -59,20 +59,26 @@ export const useCartStore = create<CartState>()(
           return { items: updatedItems };
         }),
 
-      removeFromCart: (id) =>
+      removeFromCart: (templateId) =>
         set((state) => ({
-          items: state.items.filter((item) => item.id !== id),
+          items: state.items.filter((item) => item.templateId !== templateId),
         })),
 
       clearCart: () => set({ items: [] }),
 
       toggleDrawer: () => set((state) => ({ isDrawerOpen: !state.isDrawerOpen })),
       setDrawerOpen: (isOpen) => set({ isDrawerOpen: isOpen }),
-      setPendingNavigation: (tab) => set({ pendingNavigation: tab }),
+
+      totalAmount: () => {
+        return get().items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      },
+
+      totalItems: () => {
+        return get().items.reduce((sum, item) => sum + item.quantity, 0);
+      },
     }),
     {
-      name: 'shopping-cart-storage',
-      // We don't want to persist UI state like isDrawerOpen
+      name: 'vku-market-cart',
       partialize: (state) => ({ items: state.items }),
     }
   )

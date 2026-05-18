@@ -1,26 +1,442 @@
 @import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@custom-variant dark (&:where(.dark, .dark *));
+/* ─── CUSTOM FONT FACE ─────────────────────────────────────────────────────── */
+@font-face {
+  font-family: 'Dirtyline';
+  src: url('https://fonts.cdnfonts.com/s/15011/Dirtyline36DaysofType.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
 }
 
+/* ─── TAILWIND v4 THEME ─────────────────────────────────────────────────────── */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-fruit-emerald: #059669;
+  --color-fruit-emerald-light: #10B981;
+  --color-fruit-citrus: #F59E0B;
+  --color-fruit-peach: #F87171;
+  --color-surface-light: #FAFAFA;
+  --color-surface-dark: #0A0A0A;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --font-sans: 'Inter', 'Barlow', system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, monospace;
+
+  /* Animations */
+  --animate-fade-rise: fadeRise 0.8s ease-out forwards;
+  --animate-fade-rise-delay: fadeRise 0.8s ease-out 0.2s forwards;
+  --animate-fade-rise-delay-2: fadeRise 0.8s ease-out 0.4s forwards;
+
+  @keyframes fadeRise {
+    0% { opacity: 0; transform: translateY(24px); }
+    100% { opacity: 1; transform: translateY(0); }
   }
 }
 
+/* ─── CSS VARIABLES: LIGHT MODE ─────────────────────────────────────────────── */
+:root {
+  --background: #FAFAFA;
+  --foreground: #111111;
+  --surface: rgba(255,255,255,0.85);
+  --surface-hover: rgba(255,255,255,0.95);
+  --border: rgba(0,0,0,0.08);
+  --border-hover: rgba(0,0,0,0.15);
+  --muted: #52525b;
+  --card-bg: rgba(255,255,255,0.75);
+  --card-border: rgba(0,0,0,0.08);
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.06);
+  --input-bg: rgba(255,255,255,0.95);
+  --input-border: rgba(0,0,0,0.12);
+  --input-focus: rgba(5,150,105,0.35);
+  --badge-bg: rgba(0,0,0,0.04);
+  --badge-border: rgba(0,0,0,0.08);
+  --badge-text: #52525b;
+  --overlay-bg: rgba(0,0,0,0.45);
+}
+
+/* ─── CSS VARIABLES: DARK MODE ──────────────────────────────────────────────── */
+.dark {
+  --background: #0A0A0A;
+  --foreground: #f0f0f0;
+  --surface: rgba(255,255,255,0.04);
+  --surface-hover: rgba(255,255,255,0.07);
+  --border: rgba(255,255,255,0.08);
+  --border-hover: rgba(255,255,255,0.14);
+  --muted: #a1a1aa;
+  --card-bg: rgba(255,255,255,0.03);
+  --card-border: rgba(255,255,255,0.07);
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 8px 32px rgba(0,0,0,0.2);
+  --input-bg: rgba(255,255,255,0.05);
+  --input-border: rgba(255,255,255,0.1);
+  --input-focus: rgba(16,185,129,0.4);
+  --badge-bg: rgba(255,255,255,0.05);
+  --badge-border: rgba(255,255,255,0.08);
+  --badge-text: rgba(255,255,255,0.65);
+  --overlay-bg: rgba(0,0,0,0.75);
+}
+
+/* ─── BASE ──────────────────────────────────────────────────────────────────── */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', 'Barlow', system-ui, sans-serif;
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+/* ─── TYPOGRAPHY ────────────────────────────────────────────────────────────── */
+.font-heading {
+  font-family: 'Instrument Serif', Georgia, serif;
+  letter-spacing: -0.02em;
+}
+
+.font-body {
+  font-family: 'Inter', 'Barlow', system-ui, sans-serif;
+}
+
+/* ─── GLASSMORPHIC CONTAINERS ───────────────────────────────────────────────── */
+.glass-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  border: 1px solid var(--card-border);
+  border-radius: 1.25rem;
+  box-shadow: var(--card-shadow);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+}
+
+.glass-card:hover {
+  border-color: var(--border-hover);
+}
+
+.glass-stat {
+  background: var(--card-bg);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+
+/* ─── LIQUID GLASS ──────────────────────────────────────────────────────────── */
+.liquid-glass {
+  background: var(--card-bg);
+  backdrop-filter: blur(28px) saturate(1.9);
+  -webkit-backdrop-filter: blur(28px) saturate(1.9);
+  border: 1px solid var(--card-border);
+  border-radius: 9999px;
+  box-shadow: var(--card-shadow);
+}
+
+.liquid-glass-strong {
+  background: var(--surface-hover);
+  backdrop-filter: blur(40px) saturate(2.2);
+  -webkit-backdrop-filter: blur(40px) saturate(2.2);
+  border: 1px solid var(--border-hover);
+  border-radius: 9999px;
+  box-shadow: var(--card-shadow), 0 0 0 1px rgba(255,255,255,0.04);
+}
+
+/* Liquid glass for non-pill containers (boxes) */
+.liquid-glass-box {
+  background: var(--card-bg);
+  backdrop-filter: blur(28px) saturate(1.9);
+  -webkit-backdrop-filter: blur(28px) saturate(1.9);
+  border: 1px solid var(--card-border);
+  border-radius: 1.5rem;
+  box-shadow: var(--card-shadow);
+}
+
+/* ─── BUTTON SYSTEM ─────────────────────────────────────────────────────────── */
+.btn-primary {
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: white;
+  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+  border-radius: 9999px;
+  padding: 0.65rem 1.5rem;
+  font-size: 0.875rem;
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+  box-shadow: 0 2px 12px rgba(5,150,105,0.25);
+  cursor: pointer;
+  border: none;
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, #047857, #059669);
+  transform: scale(1.05);
+  box-shadow: 0 8px 28px rgba(5,150,105,0.35);
+}
+.btn-primary:active {
+  transform: scale(0.95);
+}
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--foreground);
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  padding: 0.65rem 1.5rem;
+  font-size: 0.875rem;
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+  cursor: pointer;
+}
+.btn-ghost:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-hover);
+}
+
+.btn-danger {
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  border-radius: 9999px;
+  padding: 0.65rem 1.5rem;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+/* ─── INPUT SYSTEM ──────────────────────────────────────────────────────────── */
+.input-field {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 0.75rem;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.input-field::placeholder {
+  color: var(--muted);
+}
+.input-field:focus {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px var(--input-focus);
+}
+/* Light mode select options */
+.input-field option {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* ─── BADGE SYSTEM ──────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--badge-border);
+  background: var(--badge-bg);
+  color: var(--badge-text);
+}
+.badge-success {
+  border-color: rgba(5,150,105,0.25);
+  background: rgba(5,150,105,0.1);
+  color: #059669;
+}
+.dark .badge-success {
+  border-color: rgba(16,185,129,0.25);
+  background: rgba(16,185,129,0.1);
+  color: #34d399;
+}
+.badge-warning {
+  border-color: rgba(245,158,11,0.25);
+  background: rgba(245,158,11,0.1);
+  color: #b45309;
+}
+.dark .badge-warning {
+  border-color: rgba(245,158,11,0.25);
+  background: rgba(245,158,11,0.1);
+  color: #fbbf24;
+}
+.badge-info {
+  border-color: rgba(59,130,246,0.25);
+  background: rgba(59,130,246,0.1);
+  color: #2563eb;
+}
+.dark .badge-info {
+  border-color: rgba(59,130,246,0.25);
+  background: rgba(59,130,246,0.1);
+  color: #60a5fa;
+}
+.badge-error {
+  border-color: rgba(239,68,68,0.25);
+  background: rgba(239,68,68,0.1);
+  color: #dc2626;
+}
+.dark .badge-error {
+  border-color: rgba(239,68,68,0.25);
+  background: rgba(239,68,68,0.1);
+  color: #f87171;
+}
+
+/* ─── HERO TITLE (Landing page only) ────────────────────────────────────────── */
+.hero-title {
+  font-family: 'Instrument Serif', 'Dirtyline', serif;
+  font-size: clamp(4rem, 12vw, 10rem);
+  line-height: 0.9;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  color: transparent;
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,1) 0%,
+    rgba(255,255,255,0.6) 50%,
+    rgba(255,255,255,0.2) 100%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 80px rgba(255,255,255,0.05));
+}
+
+/* ─── ANIMATED GRADIENT CTA ─────────────────────────────────────────────────── */
+@property --g1 {
+  syntax: '<color>';
+  initial-value: #F87171;
+  inherits: false;
+}
+@property --g2 {
+  syntax: '<color>';
+  initial-value: #fbbf24;
+  inherits: false;
+}
+@property --g3 {
+  syntax: '<color>';
+  initial-value: #a3e635;
+  inherits: false;
+}
+@property --g4 {
+  syntax: '<color>';
+  initial-value: #fb923c;
+  inherits: false;
+}
+@property --g5 {
+  syntax: '<color>';
+  initial-value: #F59E0B;
+  inherits: false;
+}
+
+.animated-gradient-bg {
+  --g1: #F87171;
+  --g2: #fbbf24;
+  --g3: #a3e635;
+  --g4: #fb923c;
+  --g5: #F59E0B;
+  background: radial-gradient(circle at 20% 30%, var(--g1) 0%, transparent 50%),
+              radial-gradient(circle at 80% 20%, var(--g2) 0%, transparent 50%),
+              radial-gradient(circle at 50% 80%, var(--g3) 0%, transparent 50%),
+              radial-gradient(circle at 10% 70%, var(--g4) 0%, transparent 50%),
+              radial-gradient(circle at 90% 60%, var(--g5) 0%, transparent 50%);
+  animation: gradientShift 12s ease-in-out infinite alternate;
+  border-radius: 1.5rem;
+  overflow: hidden;
+}
+
+@keyframes gradientShift {
+  0% {
+    --g1: #F87171;
+    --g2: #fbbf24;
+    --g3: #a3e635;
+    --g4: #fb923c;
+    --g5: #F59E0B;
+  }
+  25% {
+    --g1: #fb923c;
+    --g2: #a3e635;
+    --g3: #F59E0B;
+    --g4: #F87171;
+    --g5: #fbbf24;
+  }
+  50% {
+    --g1: #fbbf24;
+    --g2: #F87171;
+    --g3: #fb923c;
+    --g4: #a3e635;
+    --g5: #059669;
+  }
+  75% {
+    --g1: #a3e635;
+    --g2: #fb923c;
+    --g3: #F87171;
+    --g4: #F59E0B;
+    --g5: #fbbf24;
+  }
+  100% {
+    --g1: #F59E0B;
+    --g2: #F87171;
+    --g3: #fbbf24;
+    --g4: #059669;
+    --g5: #a3e635;
+  }
+}
+
+/* ─── UTILITY: fade-rise initial state ──────────────────────────────────────── */
+.animate-fade-rise,
+.animate-fade-rise-delay,
+.animate-fade-rise-delay-2 {
+  opacity: 0;
+}
+
+/* ─── SCROLLBAR ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-hover); }
+
+/* ─── CANVAS ────────────────────────────────────────────────────────────────── */
+canvas { image-rendering: auto; }
+
+/* ─── BLUR TEXT REVEAL ─────────────────────────────────────────────────────── */
+@keyframes blurReveal {
+  0% {
+    filter: blur(12px);
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    filter: blur(0px);
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.blur-text-char {
+  display: inline-block;
+  animation: blurReveal 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+/* ─── FAQ ACCORDION ─────────────────────────────────────────────────────────── */
+.faq-content {
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease;
+}
+
+/* ─── FOOTER ────────────────────────────────────────────────────────────────── */
+.footer-gradient {
+  background: linear-gradient(180deg, var(--background) 0%, var(--background) 100%);
 }

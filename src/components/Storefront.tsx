@@ -4,12 +4,10 @@ import { useState, useEffect } from "react";
 import { useReadContract } from "wagmi";
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/config/contract";
 import { QRCodeSVG } from "qrcode.react";
-
-const STATUS_MAP: Record<number, { label: string; color: string }> = {
-  0: { label: "Created", color: "text-blue-400 bg-blue-400/10 border-blue-400/20" },
-  1: { label: "In Transit", color: "text-amber-400 bg-amber-400/10 border-amber-400/20" },
-  2: { label: "Delivered", color: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20" },
-};
+import { useCartStore } from "@/store/useCartStore";
+import { MapPin, ShoppingCart, QrCode, Leaf, Search } from "lucide-react";
+import { motion } from "framer-motion";
+import toast from "react-hot-toast";
 
 interface StorefrontProps {
   onTrace: (id: string) => void;
@@ -20,14 +18,25 @@ interface TemplateInfo {
   name: string;
   origin: string;
   imageUrl: string;
+  price: number | null;
   batches: { blockchainId: string }[];
   inventory: { inWarehouse: number; onDisplay: number; sold: number } | null;
 }
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: (i: number) => ({
+    opacity: 1, y: 0,
+    transition: { duration: 0.5, delay: i * 0.08, ease: [0.25, 0.46, 0.45, 0.94] },
+  }),
+};
 
 export default function Storefront({ onTrace }: StorefrontProps) {
   const [templates, setTemplates] = useState<TemplateInfo[]>([]);
   const [validBlockchainIds, setValidBlockchainIds] = useState<Set<string>>(new Set());
   const [templateByBlockchainId, setTemplateByBlockchainId] = useState<Record<string, TemplateInfo>>({});
+  const [qrModal, setQrModal] = useState<string | null>(null);
+  const { addToCart } = useCartStore();
 
   const { data: products, isLoading, isError, error } = useReadContract({
     address: CONTRACT_ADDRESS,
@@ -35,13 +44,8 @@ export default function Storefront({ onTrace }: StorefrontProps) {
     functionName: "getAllProducts",
   });
 
-  useEffect(() => {
-    if (isError && error) {
-      console.error("RPC Error fetching products:", error);
-    }
-  }, [isError, error]);
+  useEffect(() => { if (isError && error) console.error("RPC Error:", error); }, [isError, error]);
 
-  // Fetch templates (which include batches & inventory)
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
@@ -49,64 +53,57 @@ export default function Storefront({ onTrace }: StorefrontProps) {
         if (res.ok) {
           const data: TemplateInfo[] = await res.json();
           setTemplates(data);
-
-          // Build a set of valid blockchain IDs and a lookup map
           const idSet = new Set<string>();
           const lookup: Record<string, TemplateInfo> = {};
-          data.forEach(t => {
-            t.batches.forEach(b => {
-              idSet.add(b.blockchainId);
-              lookup[b.blockchainId] = t;
-            });
-          });
+          data.forEach(t => { t.batches.forEach(b => { idSet.add(b.blockchainId); lookup[b.blockchainId] = t; }); });
           setValidBlockchainIds(idSet);
           setTemplateByBlockchainId(lookup);
         }
-      } catch (error) {
-        console.error("Failed to fetch templates:", error);
-      }
+      } catch (error) { console.error("Failed to fetch templates:", error); }
     };
     fetchTemplates();
   }, []);
 
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount);
+
+  const handleAddToCart = (tmpl: TemplateInfo) => {
+    if (!tmpl.price || tmpl.price <= 0) return;
+    addToCart({ templateId: tmpl.id, name: tmpl.name, imageUrl: tmpl.imageUrl || null, origin: tmpl.origin, price: tmpl.price });
+    toast.success(`${tmpl.name} added to cart`);
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center py-20">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-fruit-emerald/30 border-t-fruit-emerald"></div>
       </div>
     );
   }
 
   if (isError) {
     return (
-      <div className="p-8 bg-red-500/10 border border-red-500/20 rounded-2xl text-center text-red-400">
-        <p className="font-bold mb-2">Failed to load products.</p>
-        <p className="text-sm opacity-80">Please check your network connection or switch RPC endpoints.</p>
-        <p className="text-xs font-mono mt-4 opacity-50 break-all">{error?.message || "Unknown error"}</p>
+      <div className="glass-card p-8 text-center">
+        <p className="font-heading text-xl mb-2">Failed to load products</p>
+        <p className="text-sm text-[var(--muted)] font-body">Please check your network connection.</p>
+        <p className="text-xs font-mono mt-4 text-[var(--muted)] opacity-50 break-all">{error?.message || "Unknown error"}</p>
       </div>
     );
   }
 
-  // Map blockchain data, then FILTER to only show products with a valid ProductTemplate
   const allProducts = products ? (products as any[]).map(p => ({
-    id: p.id.toString(),
-    name: p.name,
-    origin: p.origin,
-    history: (p.history || []).map((h: any) => ({
-      status: Number(h.status),
-      timestamp: h.timestamp.toString(),
-    }))
+    id: p.id.toString(), name: p.name, origin: p.origin,
+    history: (p.history || []).map((h: any) => ({ status: Number(h.status), timestamp: h.timestamp.toString() }))
   })) : [];
 
-  // Task 3: Filter out legacy/orphaned blockchain products
   const safeProducts = allProducts.filter(p => validBlockchainIds.has(p.id));
 
   if (safeProducts.length === 0) {
     return (
-      <div className="p-12 bg-white/5 border border-white/10 rounded-3xl text-center">
-        <div className="text-6xl mb-4">📋</div>
-        <h3 className="text-2xl font-bold text-white mb-2">Product Catalog is Empty</h3>
-        <p className="text-gray-400">No products with valid templates have been registered yet.</p>
+      <div className="glass-card p-12 text-center">
+        <Leaf className="w-12 h-12 mx-auto mb-4 text-fruit-emerald/30" />
+        <h3 className="font-heading text-2xl mb-2">Product Catalog is Empty</h3>
+        <p className="text-[var(--muted)] font-body">No products with valid templates have been registered yet.</p>
       </div>
     );
   }
@@ -115,93 +112,109 @@ export default function Storefront({ onTrace }: StorefrontProps) {
 
   return (
     <div className="space-y-8">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-extrabold bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
-          VKU Market — Product Catalog
-        </h2>
-        <span className="text-sm text-gray-400 font-medium">{safeProducts.length} Products</span>
+        <div>
+          <h2 className="font-heading text-3xl">Product Catalog</h2>
+          <p className="text-sm text-[var(--muted)] font-body mt-1">Farm-fresh produce, verified on-chain</p>
+        </div>
+        <span className="badge badge-success">
+          <Leaf className="w-3 h-3" /> {safeProducts.length} Products
+        </span>
       </div>
 
+      {/* Product Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {safeProducts.map((product) => {
+        {safeProducts.map((product, i) => {
           const id = product.id;
-          const latestHistory = product.history.length > 0 ? product.history[product.history.length - 1] : null;
-          const statusVal = latestHistory ? latestHistory.status : 0;
-          const statusInfo = STATUS_MAP[statusVal] || { label: "Unknown", color: "text-gray-400 bg-gray-400/10 border-gray-400/20" };
-
-          // Task 2: Get inventory from template (not from old productId-based lookup)
           const tmpl = templateByBlockchainId[id];
           const inv = tmpl?.inventory;
           const imageUrl = tmpl?.imageUrl || null;
           const totalStock = inv ? (inv.inWarehouse + inv.onDisplay) : 0;
           const isInStock = totalStock > 0;
+          const hasPrice = tmpl?.price && tmpl.price > 0;
+          const canBuy = isInStock && hasPrice;
 
           return (
-            <div key={id} className="group flex flex-col bg-black/40 backdrop-blur-md border border-white/10 hover:border-cyan-500/50 rounded-3xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:shadow-cyan-500/10">
-              {/* Product Image */}
-              <div className="h-48 relative overflow-hidden flex items-center justify-center group-hover:scale-105 transition-transform duration-500 bg-[#1A1A1A]">
+            <motion.div
+              key={id}
+              custom={i}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-50px" }}
+              className="group flex flex-col bg-white dark:bg-[#111] border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden transition-all duration-300 shadow-lg dark:shadow-none hover:shadow-xl hover:shadow-slate-200 dark:hover:shadow-fruit-emerald/5"
+            >
+              {/* ── Image Area ─────────────────────────────────────────── */}
+              <div className="aspect-[4/3] relative overflow-hidden bg-[var(--surface)]">
                 {imageUrl ? (
-                  <img src={imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                  <img src={imageUrl} alt={product.name}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" />
                 ) : (
-                  <img src="https://placehold.co/600x400/1A1A1A/00E5FF?text=No+Image" alt="No image" className="w-full h-full object-cover opacity-50" />
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Leaf className="w-12 h-12 text-fruit-emerald/15" />
+                  </div>
                 )}
-                <div className="absolute top-4 left-4">
-                  <div className={`px-3 py-1 rounded-full border text-xs font-bold tracking-wide backdrop-blur-md ${statusInfo.color}`}>
-                    {statusInfo.label}
-                  </div>
+
+                {/* Status badge */}
+                <div className="absolute top-3 left-3">
+                  <span className={isInStock ? "badge badge-success" : "badge badge-error"}>
+                    {isInStock ? `In Stock · ${totalStock}` : "Sold Out"}
+                  </span>
                 </div>
-                <div className="absolute top-4 right-4">
-                  <div className={`px-3 py-1 rounded-full border text-xs font-bold backdrop-blur-md ${
-                    isInStock
-                      ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/20"
-                      : "text-red-400 bg-red-400/10 border-red-400/20"
-                  }`}>
-                    {isInStock ? `In Stock (${totalStock})` : "Sold Out"}
-                  </div>
-                </div>
+
+                {/* QR Code trigger */}
+                <button onClick={() => setQrModal(id)}
+                  className="absolute top-3 right-3 p-2 rounded-xl bg-white/80 dark:bg-[var(--surface)] backdrop-blur-sm border border-[var(--border)] hover:scale-110 transition-all opacity-0 group-hover:opacity-100"
+                  title="View QR Code">
+                  <QrCode className="w-4 h-4 text-fruit-emerald" />
+                </button>
               </div>
 
-              {/* Product Info + QR */}
-              <div className="p-6 flex-1 flex flex-col">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold text-white leading-tight group-hover:text-cyan-400 transition-colors">
-                      {product.name}
-                    </h3>
-                    <p className="text-sm text-gray-400 mt-1 flex items-center gap-1">
-                      <svg className="w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      {product.origin}
-                    </p>
-                  </div>
-                  {/* QR Code */}
-                  <div className="ml-3 p-2 bg-white rounded-lg shadow-md shrink-0" title="Scan to trace this product">
-                    <QRCodeSVG
-                      value={`${baseUrl}/?trace=${id}`}
-                      size={64}
-                      level="M"
-                    />
-                  </div>
-                </div>
-                
-                <div className="mt-auto pt-4 border-t border-white/5">
-                  <button 
-                    onClick={() => onTrace(id)}
-                    className="w-full py-2.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-cyan-500/20 active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    Trace Origin
+              {/* ── Content Area ────────────────────────────────────────── */}
+              <div className="p-5 flex-1 flex flex-col">
+                <h3 className="font-heading text-xl leading-tight tracking-tight text-slate-900 dark:text-white">{product.name}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-body mt-1.5 flex items-center gap-1">
+                  <MapPin className="w-3 h-3" /> {product.origin}
+                </p>
+
+                {hasPrice && (
+                  <p className="font-heading text-2xl text-fruit-emerald mt-3">{formatCurrency(tmpl.price!)}</p>
+                )}
+
+                {/* Actions */}
+                <div className="mt-auto pt-5 flex gap-2">
+                  <button onClick={() => onTrace(id)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold rounded-full bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/20 transition-colors">
+                    <Search className="w-3.5 h-3.5" /> Trace Origin
                   </button>
+                  {canBuy && (
+                    <button onClick={() => handleAddToCart(tmpl)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold rounded-full bg-fruit-emerald text-white hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 transition-all">
+                      <ShoppingCart className="w-3.5 h-3.5" /> Add to Cart
+                    </button>
+                  )}
                 </div>
               </div>
-            </div>
+            </motion.div>
           );
         })}
       </div>
+
+      {/* ── QR Modal ──────────────────────────────────────────────────── */}
+      {qrModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[var(--overlay-bg)] backdrop-blur-sm"
+          onClick={() => setQrModal(null)}>
+          <div className="glass-card p-8 text-center max-w-xs" onClick={e => e.stopPropagation()} style={{ borderRadius: '1.5rem' }}>
+            <h3 className="font-heading text-xl mb-4">Product QR Code</h3>
+            <div className="p-4 bg-white rounded-2xl inline-block mx-auto shadow-lg">
+              <QRCodeSVG value={`${baseUrl}/?trace=${qrModal}`} size={180} level="H" fgColor="#059669" />
+            </div>
+            <p className="text-xs text-[var(--muted)] font-body mt-4">Scan to trace this product&apos;s full journey</p>
+            <p className="font-mono text-xs text-[var(--muted)] mt-1">ID: {qrModal}</p>
+            <button onClick={() => setQrModal(null)} className="btn-ghost mt-4 w-full !text-sm">Close</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

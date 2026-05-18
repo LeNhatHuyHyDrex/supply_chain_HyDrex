@@ -46,12 +46,12 @@ export default function QRScannerModal({ onScanSuccess, onClose }: QRScannerModa
   }, [onScanSuccess]);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="bg-zinc-900 border border-white/10 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between p-5 border-b border-white/10 bg-black/20">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-[var(--overlay-bg)] backdrop-blur-md">
+      <div className="glass-card !rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b border-white/10 bg-[var(--surface)]">
           <div className="flex items-center gap-2">
             <span className="text-xl">📷</span>
-            <h3 className="text-lg font-bold text-white">Quét mã QR</h3>
+            <h3 className="text-lg font-bold">Quét mã QR</h3>
           </div>
           <button 
             onClick={onClose} 
@@ -64,7 +64,7 @@ export default function QRScannerModal({ onScanSuccess, onClose }: QRScannerModa
         </div>
         
         <div className="p-6">
-          <div id="qr-reader" className="w-full rounded-2xl overflow-hidden border-2 border-dashed border-white/20 bg-black/40"></div>
+          <div id="qr-reader" className="w-full rounded-2xl overflow-hidden border-2 border-dashed border-white/20 bg-[var(--surface)]"></div>
           
           <div className="mt-6 space-y-3">
             <div className="flex items-start gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
@@ -76,7 +76,7 @@ export default function QRScannerModal({ onScanSuccess, onClose }: QRScannerModa
           </div>
         </div>
 
-        <div className="p-5 border-t border-white/10 bg-black/20 text-center">
+        <div className="p-5 border-t border-white/10 bg-[var(--surface)] text-center">
           <button 
             onClick={onClose}
             className="px-6 py-2 rounded-xl text-gray-300 bg-white/5 border border-white/10 hover:bg-white/10 transition-all font-medium"

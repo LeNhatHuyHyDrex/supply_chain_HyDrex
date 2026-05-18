@@ -30,10 +30,10 @@ export default function LocationMapModal({ initialLat = 16.0470, initialLng = 10
   const [position, setPosition] = useState<L.LatLng | null>(null);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-white/10 bg-black/20">
-          <h3 className="text-lg font-bold text-white">Pick Location from Map</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--overlay-bg)] backdrop-blur-sm">
+      <div className="glass-card !rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-white/10 bg-[var(--surface)]">
+          <h3 className="text-lg font-bold">Pick Location from Map</h3>
           <button onClick={onClose} type="button" className="text-gray-400 hover:text-white transition-colors">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -52,7 +52,7 @@ export default function LocationMapModal({ initialLat = 16.0470, initialLng = 10
           </MapContainer>
         </div>
 
-        <div className="p-4 border-t border-white/10 bg-black/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="p-4 border-t border-white/10 bg-[var(--surface)] flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-sm text-gray-400">
             {position ? (
               <span>Selected: <span className="text-white font-mono">{position.lat.toFixed(6)}, {position.lng.toFixed(6)}</span></span>
@@ -68,7 +68,7 @@ export default function LocationMapModal({ initialLat = 16.0470, initialLng = 10
               type="button"
               onClick={() => position && onConfirm(position.lat, position.lng)}
               disabled={!position}
-              className="flex-1 sm:flex-none px-6 py-2 rounded-xl text-white font-semibold bg-rose-500 hover:bg-rose-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 sm:flex-none px-6 py-2 rounded-xl font-semibold bg-rose-500 hover:bg-rose-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               Confirm Location
             </button>

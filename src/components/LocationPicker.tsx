@@ -85,12 +85,12 @@ export default function LocationPicker({
             <select
               id="presetLocation"
               onChange={handlePredefinedChange}
-              className={`w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white outline-none appearance-none transition-all ${ringColor}`}
+              className={`w-full px-4 py-3 bg-[var(--surface)] border border-white/10 rounded-xl outline-none appearance-none transition-all ${ringColor}`}
               defaultValue=""
             >
-              <option value="" disabled className="bg-zinc-900">-- Choose Preset Location --</option>
+              <option value="" disabled>-- Choose Preset Location --</option>
               {PREDEFINED_LOCATIONS.map((loc) => (
-                <option key={loc.name} value={loc.name} className="bg-zinc-900">
+                <option key={loc.name} value={loc.name}>
                   {loc.name}
                 </option>
               ))}
@@ -135,7 +135,7 @@ export default function LocationPicker({
           value={location}
           onChange={(e) => setLocation(e.target.value)}
           placeholder="e.g. Factory in Da Nang"
-          className={`w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-gray-500 transition-all outline-none ${ringColor}`}
+          className={`w-full px-4 py-3 bg-[var(--surface)] border border-white/10 rounded-xl placeholder-gray-500 transition-all outline-none ${ringColor}`}
           required
         />
       </div>
@@ -152,7 +152,7 @@ export default function LocationPicker({
             value={latitude}
             onChange={(e) => setLatitude(e.target.value)}
             placeholder="e.g. 16.0471"
-            className={`w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-gray-500 transition-all outline-none ${ringColor}`}
+            className={`w-full px-4 py-3 bg-[var(--surface)] border border-white/10 rounded-xl placeholder-gray-500 transition-all outline-none ${ringColor}`}
             required
           />
         </div>
@@ -167,7 +167,7 @@ export default function LocationPicker({
             value={longitude}
             onChange={(e) => setLongitude(e.target.value)}
             placeholder="e.g. 108.2062"
-            className={`w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-gray-500 transition-all outline-none ${ringColor}`}
+            className={`w-full px-4 py-3 bg-[var(--surface)] border border-white/10 rounded-xl placeholder-gray-500 transition-all outline-none ${ringColor}`}
             required
           />
         </div>
