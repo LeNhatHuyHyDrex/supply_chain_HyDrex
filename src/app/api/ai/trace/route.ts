@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma';
 import { createPublicClient, http } from 'viem';
 import { sepolia } from 'viem/chains';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/config/contract';
-import { callGeminiWithRotation, getGeminiKeys } from '@/lib/geminiKeys';
 
 const FALLBACK = "Xin lỗi, tôi không thể truy xuất thông tin lúc này. Vui lòng thử lại sau hoặc sử dụng chức năng Truy xuất nguồn gốc để tra cứu trực tiếp bằng ID sản phẩm.";
 
@@ -134,10 +133,7 @@ export async function POST(request: Request) {
       batchData = [];
     }
 
-    // ── Check if any keys are available ──────────────────────────────
-    if (getGeminiKeys().length === 0) {
-      return NextResponse.json({ answer: FALLBACK });
-    }
+
 
     // ── Step 3: Fetch on-chain history ONLY for matched batches ──────
     const enrichedBatches = await Promise.all(
@@ -185,27 +181,45 @@ Quy tắc:
 2. Luôn nhắc đến tính xác thực bất biến trên blockchain.
 3. Không dùng markdown. Không bịa đặt dữ liệu.`;
 
-    // ── Step 5: Call Gemini with key rotation ─────────────────────────
-    const result = await callGeminiWithRotation(
-      {
-        system_instruction: { parts: [{ text: systemInstruction }] },
-        contents: [{ parts: [{ text: userQuery.trim() }] }],
-        generationConfig: {
-          temperature: 0.3,
-          topP: 0.85,
-        },
-      },
-      15000,
-    );
+    // ── Step 5: Call OpenRouter ─────────────────────────
+    console.log("DEBUG: Using OpenRouter Model:", "openrouter/free");
 
-    if (!result) {
-      return NextResponse.json({ answer: FALLBACK });
+    const apiKey = process.env.OPENROUTER_API_KEY || "";
+    const headers = {
+      "Authorization": `Bearer ${apiKey}`,
+      "HTTP-Referer": "https://vku-market.id.vn",
+      "X-Title": "VKU Market",
+      "Content-Type": "application/json"
+    };
+
+    const result = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: "openrouter/free",
+        messages: [
+          { role: "system", content: systemInstruction },
+          { role: "user", content: userQuery.trim() }
+        ]
+      })
+    });
+
+    if (!result.ok) {
+      if (result.status === 429) {
+        return NextResponse.json({ answer: FALLBACK, error: "Rate limit reached." }, { status: 429 });
+      }
+      throw new Error(`OpenRouter error: ${result.status}`);
     }
 
-    const answer = result.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    const data = await result.json();
+    const answer = data.choices?.[0]?.message?.content?.trim();
+
     return NextResponse.json({ answer: answer || FALLBACK });
   } catch (error: any) {
     console.error('Provenance Guardian error:', error);
-    return NextResponse.json({ answer: FALLBACK });
+    if (error.status === 429) {
+      return NextResponse.json({ answer: FALLBACK, error: "Rate limit reached." }, { status: 429 });
+    }
+    return NextResponse.json({ answer: FALLBACK, error: "AI request failed." }, { status: 500 });
   }
 }

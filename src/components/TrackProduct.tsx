@@ -56,6 +56,9 @@ export default function TrackProduct({ initialId, isFocusMode, onBack }: TrackPr
 
   return (
     <div className={`glass-card overflow-hidden mx-auto ${isFocusMode ? 'w-full min-h-screen rounded-none border-none p-4 md:p-6' : 'w-full max-w-2xl p-4 md:p-8 min-h-screen'}`}>
+      <button onClick={() => window.location.reload()} className="md:hidden text-emerald-500 font-bold mb-4 flex items-center gap-2">
+        ← Về trang chủ
+      </button>
       {isFocusMode && onBack && (
         <button onClick={onBack} className="text-emerald-500 pb-6 font-bold flex items-center gap-2">
           <ArrowLeft className="w-5 h-5"/> Về trang chủ

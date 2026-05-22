@@ -3,7 +3,7 @@
 // Keys are loaded from GEMINI_KEY_1, GEMINI_KEY_2, GEMINI_KEY_3 env vars,
 // with fallback to legacy GEMINI_API_KEY for backwards compatibility.
 
-const GEMINI_MODEL = 'gemini-3-flash-preview';
+const GEMINI_MODEL = 'gemini-2.0-flash';
 
 /**
  * Get all configured Gemini API keys, filtering out empty values.

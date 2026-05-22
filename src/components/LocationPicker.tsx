@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import toast from "react-hot-toast";
 import dynamic from "next/dynamic";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Search } from "lucide-react";
 
 const LocationMapModal = dynamic(() => import("./LocationMapModal"), { ssr: false });
 
@@ -34,7 +34,7 @@ export default function LocationPicker({
   theme = "emerald",
 }: LocationPickerProps) {
   const [isLocating, setIsLocating] = useState(false);
-  const [isAILocating, setIsAILocating] = useState(false);
+  const [isFetchingCoords, setIsFetchingCoords] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
 
   const ringColor = theme === "purple" ? "focus:ring-purple-500/50 focus:border-purple-500/50" : "focus:ring-emerald-500/50 focus:border-emerald-500/50";
@@ -73,32 +73,54 @@ export default function LocationPicker({
     );
   };
 
-  const handleAILocate = async () => {
+  const handleGetCoords = async () => {
     if (!location) {
       toast.error("Vui lòng nhập tên địa điểm trước (VD: Chợ Hàn Đà Nẵng)");
       return;
     }
-    setIsAILocating(true);
+    setIsFetchingCoords(true);
     try {
-      const res = await fetch('/api/ai/geocode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ locationName: location })
-      });
-      const data = await res.json();
+      // 1. Normalize with OpenRouter AI via secure backend endpoint
+      console.log("[AI Normalization] Normalizing location:", location);
       
-      if (data.lat && data.lng) {
-        setLatitude(data.lat);
-        setLongitude(data.lng);
-        toast.success("AI found location successfully!");
+      const aiRes = await fetch("/api/ai/normalize", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json" 
+        },
+        body: JSON.stringify({
+          locationName: location
+        })
+      });
+      
+      const aiData = await aiRes.json();
+      const normalized = aiData.normalized || location;
+      console.log("[AI Normalization] Normalized address:", normalized);
+
+      // 2. Geocode with Nominatim
+      const address = encodeURIComponent(normalized);
+      const url = `https://nominatim.openstreetmap.org/search?q=${address}&format=json&addressdetails=1&limit=1`;
+      
+      console.log(`[Nominatim Request] Fetching from: ${url}`);
+      const geoRes = await fetch(url, {
+        headers: { "User-Agent": "VKU-Market-Project-Dev (contact: your-email@gmail.com)" }
+      });
+      
+      const geoData = await geoRes.json();
+      console.log("[Nominatim Response]", geoData);
+
+      if (geoData && geoData.length > 0) {
+        setLatitude(geoData[0].lat);
+        setLongitude(geoData[0].lon);
+        toast.success("Location normalized & found successfully!");
       } else {
-        toast.error("AI không thể tìm thấy tọa độ. Vui lòng nhập chi tiết hơn.");
+        toast.error("AI đã chuẩn hóa nhưng không tìm thấy tọa độ trên bản đồ.");
       }
     } catch (err) {
-      console.error(err);
-      toast.error("Lỗi kết nối AI Định vị.");
+      console.error("[Geocoding Error]", err);
+      toast.error("Lỗi quá trình xử lý địa điểm.");
     } finally {
-      setIsAILocating(false);
+      setIsFetchingCoords(false);
     }
   };
 
@@ -172,15 +194,15 @@ export default function LocationPicker({
           />
           <button 
             type="button"
-            onClick={handleAILocate}
-            disabled={isAILocating}
+            onClick={handleGetCoords}
+            disabled={isFetchingCoords}
             className={`w-full sm:w-auto px-5 py-3 border rounded-xl transition-all font-medium disabled:opacity-50 flex items-center justify-center gap-2 ${btnColor}`}
           >
-            {isAILocating ? (
+            {isFetchingCoords ? (
               <div className={`w-4 h-4 border-2 border-t-transparent rounded-full animate-spin ${spinnerColor}`}></div>
             ) : (
               <>
-                <Sparkles className="w-5 h-5" /> AI Locate
+                <Search className="w-5 h-5" /> Get Coords
               </>
             )}
           </button>

@@ -110,7 +110,7 @@ export default function AITraceChat() {
                   <Shield className="w-3.5 h-3.5 text-white" />
                 </div>
               )}
-              <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm font-body leading-relaxed ${
+              <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm font-body leading-relaxed whitespace-pre-wrap break-all ${
                 msg.role === "user"
                   ? "bg-fruit-emerald text-white rounded-br-lg shadow-sm"
                   : "bg-slate-100 dark:bg-white/8 text-slate-800 dark:text-white/80 rounded-bl-lg border border-slate-200 dark:border-white/5"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useWriteContract, usePublicClient } from "wagmi";
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/config/contract";
 import { QRCodeSVG } from "qrcode.react";
 import toast from "react-hot-toast";
@@ -25,12 +25,11 @@ export default function AddProduct() {
   const [location, setLocation] = useState("");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
-  const [submittedId, setSubmittedId] = useState<string | null>(null);
-  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
   const [createdProductId, setCreatedProductId] = useState<string | null>(null);
 
   const { data: hash, isPending, writeContractAsync } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
+  const publicClient = usePublicClient();
+  const [isConfirmingTx, setIsConfirmingTx] = useState(false);
 
   useEffect(() => {
     fetch("/api/templates").then(res => res.json()).then(data => { if (Array.isArray(data)) setTemplates(data); }).catch(err => console.error("Failed to fetch templates:", err));
@@ -38,48 +37,44 @@ export default function AddProduct() {
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
 
-  useEffect(() => {
-    if (!isConfirmed || !submittedId) return;
-    const saveData = async () => {
-      try {
-        if (mode === "create") {
-          const tmplRes = await fetch("/api/templates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, origin, imageUrl }) });
-          const tmpl = await tmplRes.json();
-          if (!tmplRes.ok) throw new Error(tmpl.error);
-          const batchRes = await fetch("/api/batches", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blockchainId: submittedId, templateId: tmpl.id, quantity: Number(quantity) }) });
-          if (!batchRes.ok) { const err = await batchRes.json(); throw new Error(err.error); }
-          toast.success(`Product template created + Batch #${submittedId} saved!`);
-          setCreatedProductId(submittedId);
-          resetCreateForm();
-          const freshRes = await fetch("/api/templates");
-          const freshData = await freshRes.json();
-          if (Array.isArray(freshData)) setTemplates(freshData);
-        } else {
-          const batchRes = await fetch("/api/batches", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blockchainId: submittedId, templateId: selectedTemplateId, quantity: Number(restockQuantity) }) });
-          if (!batchRes.ok) { const err = await batchRes.json(); throw new Error(err.error); }
-          toast.success(`Restock batch #${submittedId} saved for "${selectedTemplate?.name}"!`);
-          setCreatedProductId(submittedId);
-          resetRestockForm();
-        }
-      } catch (err: any) { console.error("Post-tx save error:", err); toast.error(err.message || "Error saving after blockchain tx"); }
-    };
-    saveData();
-    setSubmittedId(null);
-  }, [isConfirmed]);
+
 
   const resetCreateForm = () => { setId(""); setName(""); setOrigin(""); setImageUrl(""); setQuantity("1"); setLocation(""); setLatitude(""); setLongitude(""); };
   const resetRestockForm = () => { setRestockBlockchainId(""); setRestockQuantity("1"); setLocation(""); setLatitude(""); setLongitude(""); };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!id || !name || !origin || !location || !latitude || !longitude || isPending || isConfirming) return;
-    setSubmittedId(id); setCreatedProductId(null);
+    if (!id || !name || !origin || !location || !latitude || !longitude || isPending || isConfirmingTx) return;
+    if (!publicClient) { toast.error("Public client not ready"); return; }
+    setCreatedProductId(null);
     try {
       const scaledLat = BigInt(Math.floor(Number(latitude) * 1000000));
       const scaledLng = BigInt(Math.floor(Number(longitude) * 1000000));
-      await writeContractAsync({ address: CONTRACT_ADDRESS, abi: CONTRACT_ABI, functionName: "addProduct", args: [BigInt(id), name, origin, location, scaledLat, scaledLng] });
+      const txHash = await writeContractAsync({ address: CONTRACT_ADDRESS, abi: CONTRACT_ABI, functionName: "addProduct", args: [BigInt(id), name, origin, location, scaledLat, scaledLng] });
+      
+      setIsConfirmingTx(true);
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+      setIsConfirmingTx(false);
+
+      if (receipt.status === 'success') {
+        console.log("Blockchain TX Success. Syncing to Database...");
+        const tmplRes = await fetch("/api/templates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, origin, imageUrl }) });
+        const tmpl = await tmplRes.json();
+        if (!tmplRes.ok) throw new Error(tmpl.error);
+        const batchRes = await fetch("/api/batches", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blockchainId: id, templateId: tmpl.id, quantity: Number(quantity) }) });
+        if (!batchRes.ok) { const err = await batchRes.json(); throw new Error(err.error); }
+        toast.success(`Product template created + Batch #${id} saved!`);
+        setCreatedProductId(id);
+        resetCreateForm();
+        const freshRes = await fetch("/api/templates");
+        const freshData = await freshRes.json();
+        if (Array.isArray(freshData)) setTemplates(freshData);
+      } else {
+        toast.error("Giao dịch Blockchain thất bại (Reverted).");
+      }
     } catch (error: any) {
       console.error("Blockchain Transaction Error:", error);
+      setIsConfirmingTx(false);
       
       const errMsg = error?.message?.toLowerCase() || "";
       
@@ -88,23 +83,37 @@ export default function AddProduct() {
       } else if (errMsg.includes("gas") || errMsg.includes("revert") || errMsg.includes("execution reverted")) {
         toast.error("Lỗi Blockchain: Không thể ước tính phí Gas. Khả năng cao Blockchain ID này ĐÃ TỒN TẠI hoặc dữ liệu không hợp lệ. Vui lòng thử một ID khác.", { duration: 6000 });
       } else {
-        toast.error("Đã xảy ra lỗi khi tương tác với Blockchain. Vui lòng thử lại.");
+        toast.error(error?.message || "Đã xảy ra lỗi khi tương tác với Blockchain. Vui lòng thử lại.");
       }
-    } finally {
-      setSubmittedId(null);
     }
   };
 
   const handleRestockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!restockBlockchainId || !selectedTemplateId || !selectedTemplate || !location || !latitude || !longitude || isPending || isConfirming) return;
-    setSubmittedId(restockBlockchainId); setCreatedProductId(null);
+    if (!restockBlockchainId || !selectedTemplateId || !selectedTemplate || !location || !latitude || !longitude || isPending || isConfirmingTx) return;
+    if (!publicClient) { toast.error("Public client not ready"); return; }
+    setCreatedProductId(null);
     try {
       const scaledLat = BigInt(Math.floor(Number(latitude) * 1000000));
       const scaledLng = BigInt(Math.floor(Number(longitude) * 1000000));
-      await writeContractAsync({ address: CONTRACT_ADDRESS, abi: CONTRACT_ABI, functionName: "addProduct", args: [BigInt(restockBlockchainId), selectedTemplate.name, selectedTemplate.origin, location, scaledLat, scaledLng] });
+      const txHash = await writeContractAsync({ address: CONTRACT_ADDRESS, abi: CONTRACT_ABI, functionName: "addProduct", args: [BigInt(restockBlockchainId), selectedTemplate.name, selectedTemplate.origin, location, scaledLat, scaledLng] });
+      
+      setIsConfirmingTx(true);
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+      setIsConfirmingTx(false);
+
+      if (receipt.status === 'success') {
+        const batchRes = await fetch("/api/batches", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blockchainId: restockBlockchainId, templateId: selectedTemplateId, quantity: Number(restockQuantity) }) });
+        if (!batchRes.ok) { const err = await batchRes.json(); throw new Error(err.error); }
+        toast.success(`Restock batch #${restockBlockchainId} saved for "${selectedTemplate.name}"!`);
+        setCreatedProductId(restockBlockchainId);
+        resetRestockForm();
+      } else {
+        toast.error("Giao dịch Blockchain thất bại (Reverted).");
+      }
     } catch (error: any) {
       console.error("Blockchain Transaction Error:", error);
+      setIsConfirmingTx(false);
 
       const errMsg = error?.message?.toLowerCase() || "";
 
@@ -115,8 +124,6 @@ export default function AddProduct() {
       } else {
         toast.error("Đã xảy ra lỗi khi tương tác với Blockchain. Vui lòng thử lại.");
       }
-    } finally {
-      setSubmittedId(null);
     }
   };
 
@@ -182,8 +189,8 @@ export default function AddProduct() {
 
           <LocationPicker location={location} setLocation={setLocation} latitude={latitude} setLatitude={setLatitude} longitude={longitude} setLongitude={setLongitude} theme="emerald" />
 
-          <button type="submit" disabled={isPending || isConfirming} className="btn-primary w-full !py-3.5">
-            {isPending ? "Confirming in Wallet..." : isConfirming ? "Transaction Pending..." : "Create Product + Send to Chain"}
+          <button type="submit" disabled={isPending || isConfirmingTx} className="btn-primary w-full !py-3.5">
+            {isPending ? "Confirming in Wallet..." : isConfirmingTx ? "Transaction Pending..." : "Create Product + Send to Chain"}
           </button>
         </form>
       )}
@@ -228,14 +235,13 @@ export default function AddProduct() {
 
           <LocationPicker location={location} setLocation={setLocation} latitude={latitude} setLatitude={setLatitude} longitude={longitude} setLongitude={setLongitude} theme="emerald" />
 
-          <button type="submit" disabled={isPending || isConfirming || !selectedTemplateId} className="btn-primary w-full !py-3.5">
-            {isPending ? "Confirming in Wallet..." : isConfirming ? "Transaction Pending..." : "Restock → Send Batch to Chain"}
+          <button type="submit" disabled={isPending || isConfirmingTx || !selectedTemplateId} className="btn-primary w-full !py-3.5">
+            {isPending ? "Confirming in Wallet..." : isConfirmingTx ? "Transaction Pending..." : "Restock → Send Batch to Chain"}
           </button>
         </form>
       )}
 
-      {/* Success QR */}
-      {isConfirmed && createdProductId && (
+      {createdProductId && (
         <div className="mt-8 p-6 glass-stat rounded-xl flex flex-col items-center gap-4 text-center">
           <div className="p-3 bg-white rounded-xl shadow-lg">
             <QRCodeSVG value={createdProductId} size={150} />

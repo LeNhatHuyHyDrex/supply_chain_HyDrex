@@ -40,7 +40,7 @@ export function TypewriterText({ text }: { text: string }) {
 
 export default function AILoveBox() {
   const [text, setText] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const coordsRef = useRef<{ lat: number; lon: number }>({ lat: DEFAULT_LAT, lon: DEFAULT_LON });
   const geoResolvedRef = useRef(false);
   const { locale } = useChangeLocale();
@@ -65,16 +65,7 @@ export default function AILoveBox() {
     );
   }, []);
 
-  const fetchRecommendation = async (force = false) => {
-    if (!force) {
-      const cached = sessionStorage.getItem(`ai_recommend_${locale}`);
-      if (cached) {
-        setText(cached);
-        setIsLoading(false);
-        return;
-      }
-    }
-
+  const handleGetSuggestion = async () => {
     setIsLoading(true);
     setText("");
     try {
@@ -87,13 +78,20 @@ export default function AILoveBox() {
           lang: locale,
         }),
       });
+      
       const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || "API Request Failed");
+      }
+      
       console.log("FULL AI TEXT RECEIVED:", data.text);
       setText(data.text || "");
       if (data.text) {
         sessionStorage.setItem(`ai_recommend_${locale}`, data.text);
       }
-    } catch {
+    } catch (error) {
+      alert("Hệ thống AI đang bảo trì, vui lòng thử lại sau");
       const fallback = locale === "vi"
           ? "🍊 Hôm nay hãy bổ sung vitamin C với cam tươi ngon nhé! Trái cây tươi luôn sẵn sàng cho bạn."
           : "🍊 Refresh your day with fresh citrus fruits! VKU Market has the best selection for you.";
@@ -103,10 +101,6 @@ export default function AILoveBox() {
       setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchRecommendation();
-  }, [locale]);
 
   // Typewriter effect extracted to <TypewriterText />
 
@@ -145,20 +139,30 @@ export default function AILoveBox() {
                   {locale === "vi" ? "Lão Nông đang suy nghĩ..." : "The farmer is thinking..."}
                 </span>
               </div>
-            ) : (
+            ) : text ? (
               <TypewriterText text={text} />
+            ) : (
+              <button 
+                onClick={handleGetSuggestion} 
+                className="px-4 py-2 mt-1 bg-gradient-to-r from-fruit-emerald to-emerald-600 text-white rounded-xl hover:shadow-lg hover:shadow-emerald-500/30 transition-all text-sm font-bold font-body flex items-center gap-2"
+              >
+                <Sprout className="w-4 h-4" />
+                Nhận gợi ý từ Lão Nông
+              </button>
             )}
           </div>
 
           {/* ── Refresh Button ─────── */}
-          <button
-            onClick={() => fetchRecommendation(true)}
-            disabled={isLoading}
-            className="shrink-0 p-2 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 dark:text-white/40 hover:text-fruit-emerald transition-all disabled:opacity-30"
-            title={locale === "vi" ? "Hỏi lại Lão Nông" : "Ask again"}
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
-          </button>
+          {text && (
+            <button
+              onClick={() => handleGetSuggestion()}
+              disabled={isLoading}
+              className="shrink-0 p-2 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 dark:text-white/40 hover:text-fruit-emerald transition-all disabled:opacity-30"
+              title={locale === "vi" ? "Hỏi lại Lão Nông" : "Ask again"}
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { callGeminiWithRotation, getGeminiKeys } from '@/lib/geminiKeys';
+
 
 const FALLBACK_VI = "🍉 Hãy bổ sung vitamin C với cam tươi và thanh long đỏ! Trái cây tươi ngon từ VKU Market luôn sẵn sàng cho bạn.";
 const FALLBACK_EN = "🍉 Refresh yourself with fresh oranges and dragon fruit! VKU Market has the freshest produce waiting for you.";
@@ -134,10 +134,7 @@ export async function POST(request: Request) {
       products = [];
     }
 
-    // ── Check if any keys are available ──────────────────────────────
-    if (getGeminiKeys().length === 0) {
-      return NextResponse.json({ text: lang === 'vi' ? FALLBACK_VI : FALLBACK_EN });
-    }
+
 
     // ── Build stock JSON for prompt ──────────────────────────────────
     const stockJson = products.length > 0
@@ -178,26 +175,39 @@ Available produce in stock with prices: ${JSON.stringify(stockJson)}
 
 Write a short, friendly, and empathetic consulting paragraph (3-4 sentences). Start by mentioning the weather and location to build rapport. Suggest 1-2 seasonal fruits from the stock that fit the weather. Explain the benefits passionately (e.g., cooling, hydration) and highlight they are perfectly in season, best priced, and verified on-chain. Do not use markdown. Do not just list items.`;
 
-    // ── Call Gemini with key rotation ─────────────────────────────────
-    const result = await callGeminiWithRotation(
-      {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.85,
-          topP: 0.95,
-        },
-      },
-      8000,
-    );
+    // ── Call OpenRouter ─────────────────────────────────
+    console.log("DEBUG: Using OpenRouter Model:", "openrouter/free");
+    
+    const apiKey = process.env.OPENROUTER_API_KEY || "";
+    const headers = {
+      "Authorization": `Bearer ${apiKey}`,
+      "HTTP-Referer": "https://vku-market.id.vn",
+      "X-Title": "VKU Market",
+      "Content-Type": "application/json"
+    };
 
-    if (!result) {
-      return NextResponse.json({ text: lang === 'vi' ? FALLBACK_VI : FALLBACK_EN });
+    const result = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: "openrouter/free",
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    if (!result.ok) {
+      if (result.status === 429) {
+        return NextResponse.json({ error: "Rate limit reached." }, { status: 429 });
+      }
+      throw new Error(`OpenRouter error: ${result.status}`);
     }
 
-    const text = result.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    const data = await result.json();
+    const text = data.choices?.[0]?.message?.content?.trim();
+
     return NextResponse.json({ text: text || (lang === 'vi' ? FALLBACK_VI : FALLBACK_EN) });
   } catch (error: any) {
     console.error('Lão Nông Advisor error:', error);
-    return NextResponse.json({ text: FALLBACK_VI });
+    return NextResponse.json({ error: "AI request failed." }, { status: 500 });
   }
 }
