@@ -52,6 +52,29 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const templateId = searchParams.get('templateId');
+    const blockchainId = searchParams.get('blockchainId');
+
+    if (blockchainId) {
+      if (blockchainId === '103' || blockchainId === '104') {
+        return NextResponse.json(null);
+      }
+      const activeBatch = await prisma.batchRecord.findUnique({
+        where: { blockchainId: String(blockchainId) },
+        include: {
+          template: {
+            include: {
+              batches: {
+                where: {
+                  blockchainId: { notIn: ['103', '104'] }
+                }
+              },
+              inventory: true
+            }
+          }
+        }
+      });
+      return NextResponse.json(activeBatch);
+    }
 
     const where: any = templateId
       ? { templateId, blockchainId: { notIn: ['103', '104'] } }

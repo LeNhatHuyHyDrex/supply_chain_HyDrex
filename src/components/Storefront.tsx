@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useReadContract } from "wagmi";
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/config/contract";
 import { QRCodeSVG } from "qrcode.react";
@@ -11,6 +11,8 @@ import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
 
 interface StorefrontProps {
   onTrace?: (id: string) => void;
@@ -83,7 +85,9 @@ export default function Storefront({ onTrace }: StorefrontProps) {
     const lookup: Record<string, TemplateInfo> = {};
     if (templates) {
       templates.forEach(t => {
+        if ((t as any).status === 'REJECTED') return;
         t.batches.forEach(b => {
+          if (!b.blockchainId || b.blockchainId === "null" || b.blockchainId === "undefined") return;
           idSet.add(b.blockchainId);
           lookup[b.blockchainId] = t;
         });
@@ -94,15 +98,18 @@ export default function Storefront({ onTrace }: StorefrontProps) {
 
   const allProducts = useMemo(() => {
     if (!products) return [];
-    return (products as any[]).map(p => ({
-      id: p.id.toString(),
-      name: p.name,
-      origin: p.origin,
-      history: (p.history || []).map((h: any) => ({
-        status: Number(h.status),
-        timestamp: h.timestamp.toString(),
-      })),
-    }));
+    return (products as any[])
+      .map(p => ({
+        id: p.id ? p.id.toString() : "",
+        name: p.name,
+        origin: p.origin,
+        status: p.status || "",
+        history: (p.history || []).map((h: any) => ({
+          status: Number(h.status),
+          timestamp: h.timestamp.toString(),
+        })),
+      }))
+      .filter(p => p.id && p.id !== "null" && p.id !== "undefined" && p.status !== 'REJECTED');
   }, [products]);
 
   const safeProducts = useMemo(() => {
@@ -135,7 +142,7 @@ export default function Storefront({ onTrace }: StorefrontProps) {
 
   // Group by name AND origin so that products of different origins appear as distinct cards
   const groupedProducts = useMemo(() => {
-    return productsWithStock.reduce((acc: any[], curr: any) => {
+    const grouped = productsWithStock.reduce((acc: any[], curr: any) => {
       const existing = acc.find(item => item.name === curr.name && item.origin === curr.origin);
       if (existing) {
         existing.totalStock += curr.stock;
@@ -145,6 +152,12 @@ export default function Storefront({ onTrace }: StorefrontProps) {
       }
       return acc;
     }, []);
+
+    return grouped.map(gp => {
+      const sortedBatches = [...gp.batches].sort((a, b) => Number(b.id) - Number(a.id));
+      const latestBatchId = sortedBatches[0]?.id || gp.id;
+      return { ...gp, batchId: latestBatchId };
+    });
   }, [productsWithStock]);
 
   const displayedProducts = useMemo(() => {
@@ -154,13 +167,13 @@ export default function Storefront({ onTrace }: StorefrontProps) {
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount);
 
-  const handleAddToCart = (tmpl: TemplateInfo) => {
+  const handleAddToCart = useCallback((tmpl: TemplateInfo) => {
     if (!tmpl.price || tmpl.price <= 0) return;
     addToCart({ templateId: tmpl.id, name: tmpl.name, imageUrl: tmpl.imageUrl || null, origin: tmpl.origin, price: tmpl.price });
     toast.success(t("addedToCart", { name: tmpl.name }));
-  };
+  }, [addToCart, t]);
 
-  const handleTrack = (product: any) => {
+  const handleTrack = useCallback((product: any) => {
     // Sort batches descending by numerical blockchain ID to find the latest
     const sortedBatches = [...product.batches].sort((a, b) => Number(b.id) - Number(a.id));
     const latestBatchId = sortedBatches[0]?.id || product.id;
@@ -169,7 +182,7 @@ export default function Storefront({ onTrace }: StorefrontProps) {
       onTrace(latestBatchId);
     }
     router.push(`/tracking?batchId=${latestBatchId}`);
-  };
+  }, [onTrace, router]);
 
   if (isLoading) {
     return (
@@ -266,8 +279,7 @@ export default function Storefront({ onTrace }: StorefrontProps) {
               {/* ── Image Area ─────────────────────────────────────────── */}
               <div className="aspect-[4/3] relative overflow-hidden bg-[var(--surface)]">
                 {imageUrl ? (
-                  <img src={imageUrl} alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" />
+                  <Image src={imageUrl} alt={product.name} fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" priority={i < 3} className="object-cover group-hover:scale-110 transition-transform duration-700 ease-out" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <Leaf className="w-12 h-12 text-fruit-emerald/15" />
@@ -275,7 +287,7 @@ export default function Storefront({ onTrace }: StorefrontProps) {
                 )}
 
                 {/* Status badge */}
-                <div className="absolute top-3 left-3">
+                <div className="absolute top-3 left-3 z-10">
                   <span className={isInStock ? "badge badge-success" : "badge badge-error"}>
                     {isInStock ? `${t("inStock")} · ${totalStock}` : t("soldOut")}
                   </span>
@@ -283,7 +295,7 @@ export default function Storefront({ onTrace }: StorefrontProps) {
 
                 {/* QR Code trigger */}
                 <button onClick={() => setQrModal(id)}
-                  className="absolute top-3 right-3 p-2 rounded-xl bg-white/80 dark:bg-[var(--surface)] backdrop-blur-sm border border-[var(--border)] hover:scale-110 transition-all opacity-0 group-hover:opacity-100"
+                  className="absolute top-3 right-3 p-2 rounded-xl bg-white/80 dark:bg-[var(--surface)] backdrop-blur-sm border border-[var(--border)] hover:scale-110 transition-all opacity-0 group-hover:opacity-100 z-10"
                   title="View QR Code">
                   <QrCode className="w-4 h-4 text-fruit-emerald" />
                 </button>
@@ -302,10 +314,10 @@ export default function Storefront({ onTrace }: StorefrontProps) {
 
                 {/* Actions */}
                 <div className="mt-auto pt-5 flex gap-2">
-                  <button onClick={() => handleTrack(product)}
+                  <Link href={`/tracking?batchId=${product.batchId}`}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold rounded-full bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/20 transition-colors">
                     <Search className="w-3.5 h-3.5" /> {t("traceOrigin")}
-                  </button>
+                  </Link>
                   {canBuy && (
                     <button onClick={() => handleAddToCart(tmpl)}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold rounded-full bg-fruit-emerald text-white hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 transition-all">

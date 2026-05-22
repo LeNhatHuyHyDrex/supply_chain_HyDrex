@@ -1,15 +1,17 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import TrackProduct from "@/components/TrackProduct";
 import { Suspense } from "react";
 
 function TrackingPageInner() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const batchId = searchParams.get("batchId");
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#0A0A0B] py-12 px-4 md:px-8">
+      <button onClick={() => router.back()} className="fixed top-4 left-4 z-50 p-2 bg-emerald-600 rounded-full text-white">← Back</button>
       <TrackProduct initialId={batchId} isFocusMode={false} />
     </div>
   );

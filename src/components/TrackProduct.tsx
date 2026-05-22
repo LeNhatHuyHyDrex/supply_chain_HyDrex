@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useReadContract } from "wagmi";
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/config/contract";
 import { QRCodeSVG } from "qrcode.react";
@@ -11,6 +11,8 @@ import AITraceChat from "./AITraceChat";
 import toast from "react-hot-toast";
 import { ArrowLeft } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
+import Image from "next/image";
 
 const MapTrace = dynamic(() => import("./MapTrace"), { ssr: false });
 
@@ -28,60 +30,54 @@ const truncateAddress = (address: string) => {
 interface TrackProductProps { initialId?: string | null; isFocusMode?: boolean; onBack?: () => void; }
 
 export default function TrackProduct({ initialId, isFocusMode, onBack }: TrackProductProps = {}) {
-  const [searchId, setSearchId] = useState(initialId || "");
-  const [queryId, setQueryId] = useState<string | null>(initialId || null);
+  const searchParams = useSearchParams();
+  const batchIdParam = searchParams.get("batchId");
+  const activeId = initialId || batchIdParam || "";
+
+  const [searchId, setSearchId] = useState(activeId);
+  const [queryId, setQueryId] = useState<string | null>(activeId || null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
-  const { data: templates } = useQuery<any[]>({
-    queryKey: ["templates"],
-    queryFn: async () => {
-      const res = await fetch("/api/templates");
-      if (!res.ok) throw new Error("Failed to fetch templates");
-      return res.json();
-    },
-    staleTime: 60 * 1000,
-  });
-
-  const { data: metaData } = useQuery<any>({
-    queryKey: ["productMeta", queryId],
+  const { data: batchData, isError: isBatchError, isLoading: isBatchLoading, isFetching: isBatchFetching } = useQuery<any>({
+    queryKey: ["batchDetails", queryId],
     queryFn: async () => {
       if (!queryId) return null;
-      const res = await fetch(`/api/products/meta?productId=${queryId}`);
-      if (!res.ok) throw new Error("Failed to fetch product meta");
+      const res = await fetch(`/api/batches?blockchainId=${queryId}`);
+      if (!res.ok) throw new Error("Failed to fetch batch details");
       return res.json();
     },
     enabled: !!queryId,
     staleTime: 60 * 1000,
   });
 
-  const { data: inventoryData } = useQuery<any>({
-    queryKey: ["inventory", queryId],
-    queryFn: async () => {
-      if (!queryId) return null;
-      const res = await fetch(`/api/inventory?productId=${queryId}`);
-      if (!res.ok) throw new Error("Failed to fetch inventory");
-      return res.json();
-    },
-    enabled: !!queryId,
-    staleTime: 60 * 1000,
-  });
+  useEffect(() => {
+    const nextId = initialId || batchIdParam || "";
+    if (nextId) {
+      setSearchId(nextId);
+      setQueryId(nextId);
+    }
+  }, [initialId, batchIdParam]);
 
-  useEffect(() => { if (initialId) { setSearchId(initialId); setQueryId(initialId); } }, [initialId]);
-
-  const imageUrl = metaData?.imageUrl || null;
-
-  const activeTemplate = templates?.find((t: any) =>
-    t.batches?.some((b: any) => b.blockchainId === queryId)
-  );
-
-  const siblingBatches = activeTemplate?.batches || [];
+  const imageUrl = batchData?.template?.imageUrl || null;
+  const siblingBatches = batchData?.template?.batches || [];
+  const inventoryData = batchData?.template?.inventory || null;
 
   const { data, isError, isLoading, isFetching } = useReadContract({
     address: CONTRACT_ADDRESS, abi: CONTRACT_ABI, functionName: "getProduct",
     args: queryId ? [BigInt(queryId)] : undefined, query: { enabled: !!queryId },
   });
 
-  const handleSearch = (e: React.FormEvent) => { e.preventDefault(); if (searchId) setQueryId(searchId); };
+  const handleSearch = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchId) {
+      setQueryId(searchId);
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        url.searchParams.set("batchId", searchId);
+        window.history.pushState({}, '', url.pathname + url.search);
+      }
+    }
+  }, [searchId]);
 
   const productData = data as readonly [
     bigint, string, string,
@@ -160,8 +156,12 @@ export default function TrackProduct({ initialId, isFocusMode, onBack }: TrackPr
           <div className="flex flex-col md:flex-row gap-5">
             <div className="flex-1 flex flex-col gap-4">
               <div className="w-full h-64 relative overflow-hidden rounded-2xl shadow-lg bg-[var(--surface)] border border-[var(--border)] flex items-center justify-center">
-                {imageUrl ? <img src={imageUrl} alt={productData[1]} className="w-full h-full object-cover" /> : <div className="text-[var(--muted)] opacity-30 text-4xl">📦</div>}
-                <div className="absolute top-3 right-3 badge">ID: {productData[0].toString()}</div>
+                {imageUrl ? (
+                  <Image src={imageUrl} alt={productData[1]} fill sizes="(max-width: 768px) 100vw, 50vw" priority className="object-cover" />
+                ) : (
+                  <div className="text-[var(--muted)] opacity-30 text-4xl">📦</div>
+                )}
+                <div className="absolute top-3 right-3 badge z-10">ID: {productData[0].toString()}</div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)]">

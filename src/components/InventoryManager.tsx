@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import toast from "react-hot-toast";
 import { useUser } from "@/providers/UserProvider";
 import { CldUploadWidget } from "next-cloudinary";
 import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import Image from "next/image";
 
 interface InventoryData {
   templateId: string;
@@ -22,9 +24,6 @@ const fadeUp = {
 };
 
 export default function InventoryManager() {
-  const [inventoryList, setInventoryList] = useState<InventoryData[]>([]);
-  const [batchMap, setBatchMap] = useState<Record<string, BatchInfo[]>>({});
-  const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [expandedTemplate, setExpandedTemplate] = useState<string | null>(null);
@@ -36,33 +35,71 @@ export default function InventoryManager() {
   const canEditImage = user?.role === "ADMIN" || user?.role === "SUPPLIER";
   const canEditPrice = user?.role === "ADMIN";
 
-  const fetchData = async () => {
-    try {
-      const [invRes, batchRes] = await Promise.all([fetch("/api/inventory"), fetch("/api/batches")]);
-      if (invRes.ok) {
-        const data = await invRes.json();
-        if (Array.isArray(data)) {
-          setInventoryList(data);
-          const prices: Record<string, string> = {};
-          data.forEach((inv: InventoryData) => { prices[inv.templateId] = inv.template.price != null ? String(inv.template.price) : ""; });
-          setPriceInputs(prices);
-        }
-      }
-      if (batchRes.ok) {
-        const batches = await batchRes.json();
-        if (Array.isArray(batches)) {
-          const map: Record<string, BatchInfo[]> = {};
-          batches.forEach((b: any) => { if (!map[b.templateId]) map[b.templateId] = []; map[b.templateId].push({ blockchainId: b.blockchainId, quantity: b.quantity, isDelivered: b.isDelivered }); });
-          setBatchMap(map);
-        }
-      }
-    } catch (err) { console.error("Failed to fetch data:", err); }
-    finally { setLoading(false); }
-  };
+  // Use Query for inventory
+  const { data: inventoryData, isLoading: invLoading, refetch: refetchInventory } = useQuery<InventoryData[]>({
+    queryKey: ["inventory-list"],
+    queryFn: async () => {
+      const res = await fetch("/api/inventory");
+      if (!res.ok) throw new Error("Failed to fetch inventory");
+      return res.json();
+    },
+    staleTime: 60 * 1000,
+  });
 
-  useEffect(() => { fetchData(); }, []);
+  // Use Query for batches
+  const { data: batchesData, isLoading: batchesLoading, refetch: refetchBatches } = useQuery<any[]>({
+    queryKey: ["batches-list"],
+    queryFn: async () => {
+      const res = await fetch("/api/batches");
+      if (!res.ok) throw new Error("Failed to fetch batches");
+      return res.json();
+    },
+    staleTime: 60 * 1000,
+  });
 
-  const handleAction = async (templateId: string, action: string) => {
+  // Keep price input state synchronized when inventoryData loads
+  useEffect(() => {
+    if (inventoryData) {
+      const prices: Record<string, string> = {};
+      inventoryData.forEach((inv: InventoryData) => {
+        if (inv.template) {
+          prices[inv.templateId] = inv.template.price != null ? String(inv.template.price) : "";
+        }
+      });
+      setPriceInputs(prices);
+    }
+  }, [inventoryData]);
+
+  // Derived filter and memoized computation for ghost cleanup!
+  const inventoryList = useMemo(() => {
+    if (!inventoryData) return [];
+    return inventoryData.filter(inv => {
+      const productId = inv.templateId;
+      const hasNullId = !productId || productId === "null" || productId === "undefined";
+      const isRejected = (inv as any).status === 'REJECTED' || (inv.template as any)?.status === 'REJECTED';
+      return !hasNullId && !isRejected;
+    });
+  }, [inventoryData]);
+
+  // Derived memoized mapping for batch map!
+  const batchMap = useMemo(() => {
+    const map: Record<string, BatchInfo[]> = {};
+    if (Array.isArray(batchesData)) {
+      batchesData.forEach((b: any) => {
+        if (!map[b.templateId]) map[b.templateId] = [];
+        map[b.templateId].push({
+          blockchainId: b.blockchainId,
+          quantity: b.quantity,
+          isDelivered: b.isDelivered
+        });
+      });
+    }
+    return map;
+  }, [batchesData]);
+
+  const loading = invLoading || batchesLoading;
+
+  const handleAction = useCallback(async (templateId: string, action: string) => {
     const qty = quantities[`${templateId}-${action}`] || 1;
     if (qty < 1) { toast.error("Quantity must be at least 1"); return; }
     setActionLoading(`${templateId}-${action}`);
@@ -71,34 +108,40 @@ export default function InventoryManager() {
       const data = await res.json();
       if (!res.ok) { toast.error(data.error || "Action failed"); return; }
       toast.success(action === "shelf" ? `${qty} moved to display shelf` : `${qty} recorded as sold`);
-      await fetchData();
+      await Promise.all([refetchInventory(), refetchBatches()]);
       setQuantities(prev => ({ ...prev, [`${templateId}-${action}`]: 1 }));
     } catch { toast.error("Network error"); }
     finally { setActionLoading(null); }
-  };
+  }, [quantities, refetchInventory, refetchBatches]);
 
-  const handleImageUpdate = async (templateId: string, newImageUrl: string) => {
+  const handleImageUpdate = useCallback(async (templateId: string, newImageUrl: string) => {
     setImageUpdating(templateId);
     try {
       const res = await fetch("/api/templates", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ templateId, newImageUrl }) });
-      if (res.ok) { toast.success("Image updated!"); await fetchData(); }
+      if (res.ok) {
+        toast.success("Image updated!");
+        await Promise.all([refetchInventory(), refetchBatches()]);
+      }
       else { const data = await res.json(); toast.error(data.error || "Failed to update image"); }
     } catch { toast.error("Network error"); }
     finally { setImageUpdating(null); }
-  };
+  }, [refetchInventory, refetchBatches]);
 
-  const handlePriceSave = async (templateId: string) => {
+  const handlePriceSave = useCallback(async (templateId: string) => {
     const priceStr = priceInputs[templateId];
     const price = priceStr === "" ? null : parseFloat(priceStr);
     if (price !== null && (isNaN(price) || price < 0)) { toast.error("Invalid price"); return; }
     setPriceSaving(templateId);
     try {
       const res = await fetch("/api/templates", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ templateId, price }) });
-      if (res.ok) { toast.success(price ? `Price set to ${formatCurrency(price)}` : "Price cleared"); await fetchData(); }
+      if (res.ok) {
+        toast.success(price ? `Price set to ${formatCurrency(price)}` : "Price cleared");
+        await Promise.all([refetchInventory(), refetchBatches()]);
+      }
       else { const data = await res.json(); toast.error(data.error || "Failed"); }
     } catch { toast.error("Network error"); }
     finally { setPriceSaving(null); }
-  };
+  }, [priceInputs, refetchInventory, refetchBatches]);
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount);
   const getQty = (templateId: string, action: string) => quantities[`${templateId}-${action}`] ?? 1;
@@ -163,9 +206,11 @@ export default function InventoryManager() {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
                         {inv.template.imageUrl ? (
-                          <img src={inv.template.imageUrl} alt={inv.template.name} className="w-10 h-10 rounded-lg object-cover border border-[var(--border)]" />
+                          <div className="relative w-10 h-10 overflow-hidden rounded-lg border border-[var(--border)] shrink-0">
+                            <Image src={inv.template.imageUrl} alt={inv.template.name} fill sizes="40px" className="object-cover" />
+                          </div>
                         ) : (
-                          <div className="w-10 h-10 rounded-lg bg-[var(--surface)] flex items-center justify-center text-[var(--muted)] opacity-50 text-xs">N/A</div>
+                          <div className="w-10 h-10 rounded-lg bg-[var(--surface)] flex items-center justify-center text-[var(--muted)] opacity-50 text-xs shrink-0">N/A</div>
                         )}
                         <div>
                           <h3 className="font-heading text-lg">{inv.template.name}</h3>
