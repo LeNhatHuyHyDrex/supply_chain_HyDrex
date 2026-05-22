@@ -79,9 +79,18 @@ export default function AddProduct() {
       const scaledLng = BigInt(Math.floor(Number(longitude) * 1000000));
       await writeContractAsync({ address: CONTRACT_ADDRESS, abi: CONTRACT_ABI, functionName: "addProduct", args: [BigInt(id), name, origin, location, scaledLat, scaledLng] });
     } catch (error: any) {
-      console.error("Contract call failed:", error);
-      if (error?.message?.toLowerCase().includes("rejected") || error?.message?.toLowerCase().includes("denied")) { toast.error("Transaction cancelled by user."); }
-      else { toast.error("Transaction failed."); }
+      console.error("Blockchain Transaction Error:", error);
+      
+      const errMsg = error?.message?.toLowerCase() || "";
+      
+      if (errMsg.includes("user rejected") || error?.code === 4001 || errMsg.includes("denied")) {
+        toast.error("Giao dịch đã bị hủy bởi người dùng.");
+      } else if (errMsg.includes("gas") || errMsg.includes("revert") || errMsg.includes("execution reverted")) {
+        toast.error("Lỗi Blockchain: Không thể ước tính phí Gas. Khả năng cao Blockchain ID này ĐÃ TỒN TẠI hoặc dữ liệu không hợp lệ. Vui lòng thử một ID khác.", { duration: 6000 });
+      } else {
+        toast.error("Đã xảy ra lỗi khi tương tác với Blockchain. Vui lòng thử lại.");
+      }
+    } finally {
       setSubmittedId(null);
     }
   };
@@ -95,9 +104,18 @@ export default function AddProduct() {
       const scaledLng = BigInt(Math.floor(Number(longitude) * 1000000));
       await writeContractAsync({ address: CONTRACT_ADDRESS, abi: CONTRACT_ABI, functionName: "addProduct", args: [BigInt(restockBlockchainId), selectedTemplate.name, selectedTemplate.origin, location, scaledLat, scaledLng] });
     } catch (error: any) {
-      console.error("Contract call failed:", error);
-      if (error?.message?.toLowerCase().includes("rejected") || error?.message?.toLowerCase().includes("denied")) { toast.error("Transaction cancelled by user."); }
-      else { toast.error("Transaction failed."); }
+      console.error("Blockchain Transaction Error:", error);
+
+      const errMsg = error?.message?.toLowerCase() || "";
+
+      if (errMsg.includes("user rejected") || error?.code === 4001 || errMsg.includes("denied")) {
+        toast.error("Giao dịch đã bị hủy bởi người dùng.");
+      } else if (errMsg.includes("gas") || errMsg.includes("revert") || errMsg.includes("execution reverted")) {
+        toast.error("Lỗi Blockchain: Không thể ước tính phí Gas. Khả năng cao Blockchain ID này ĐÃ TỒN TẠI hoặc dữ liệu không hợp lệ. Vui lòng thử một ID khác.", { duration: 6000 });
+      } else {
+        toast.error("Đã xảy ra lỗi khi tương tác với Blockchain. Vui lòng thử lại.");
+      }
+    } finally {
       setSubmittedId(null);
     }
   };

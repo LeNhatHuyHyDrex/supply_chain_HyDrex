@@ -21,8 +21,16 @@ export default function QRScannerModal({ onScanSuccess, onClose }: QRScannerModa
 
     scannerRef.current.render(
       (decodedText) => {
-        // Handle success
-        onScanSuccess(decodedText);
+        // Handle URL-based QR codes: extract batchId from URL params
+        let value = decodedText;
+        try {
+          const url = new URL(decodedText);
+          const batchId = url.searchParams.get('batchId');
+          if (batchId) value = batchId;
+        } catch {
+          // Not a URL — use raw value (plain number) for backwards compatibility
+        }
+        onScanSuccess(value);
         if (scannerRef.current) {
           scannerRef.current.clear().catch((error) => {
             console.error("Failed to clear scanner", error);

@@ -22,10 +22,13 @@ const config = getDefaultConfig({
   chains: [sepolia, hardhat],
   transports: {
     [sepolia.id]: fallback([
-      http(process.env.NEXT_PUBLIC_RPC_URL),
-      http('https://ethereum-sepolia-rpc.publicnode.com'),
+      // 1. Primary: Use the one from .env if it works
+      http(process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || process.env.SEPOLIA_RPC_URL),
+      // 2. Reliable Public Fallbacks (Auto-switch if Primary throws 502/503)
+      http('https://rpc.sepolia.org'),
+      http('https://1rpc.io/sepolia'),
       http('https://rpc2.sepolia.org'),
-      http(),
+      http('https://endpoints.omniatech.io/v1/eth/sepolia/public')
     ]),
     [hardhat.id]: http(),
   },

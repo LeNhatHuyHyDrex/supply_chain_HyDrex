@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import toast from "react-hot-toast";
 import dynamic from "next/dynamic";
+import { Sparkles } from "lucide-react";
 
 const LocationMapModal = dynamic(() => import("./LocationMapModal"), { ssr: false });
 
@@ -33,6 +34,7 @@ export default function LocationPicker({
   theme = "emerald",
 }: LocationPickerProps) {
   const [isLocating, setIsLocating] = useState(false);
+  const [isAILocating, setIsAILocating] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
 
   const ringColor = theme === "purple" ? "focus:ring-purple-500/50 focus:border-purple-500/50" : "focus:ring-emerald-500/50 focus:border-emerald-500/50";
@@ -69,6 +71,35 @@ export default function LocationPicker({
         toast.error("Failed to get location. Please allow GPS permissions.");
       }
     );
+  };
+
+  const handleAILocate = async () => {
+    if (!location) {
+      toast.error("Vui lòng nhập tên địa điểm trước (VD: Chợ Hàn Đà Nẵng)");
+      return;
+    }
+    setIsAILocating(true);
+    try {
+      const res = await fetch('/api/ai/geocode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locationName: location })
+      });
+      const data = await res.json();
+      
+      if (data.lat && data.lng) {
+        setLatitude(data.lat);
+        setLongitude(data.lng);
+        toast.success("AI found location successfully!");
+      } else {
+        toast.error("AI không thể tìm thấy tọa độ. Vui lòng nhập chi tiết hơn.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Lỗi kết nối AI Định vị.");
+    } finally {
+      setIsAILocating(false);
+    }
   };
 
   return (
@@ -129,15 +160,31 @@ export default function LocationPicker({
         <label className="block text-sm font-medium text-gray-300 mb-1" htmlFor="manualLocation">
           Location Name (Manual Override)
         </label>
-        <input
-          id="manualLocation"
-          type="text"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          placeholder="e.g. Factory in Da Nang"
-          className={`w-full px-4 py-3 bg-[var(--surface)] border border-white/10 rounded-xl placeholder-gray-500 transition-all outline-none ${ringColor}`}
-          required
-        />
+        <div className="flex gap-2">
+          <input
+            id="manualLocation"
+            type="text"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="e.g. Factory in Da Nang"
+            className={`w-full px-4 py-3 bg-[var(--surface)] border border-white/10 rounded-xl placeholder-gray-500 transition-all outline-none ${ringColor}`}
+            required
+          />
+          <button 
+            type="button"
+            onClick={handleAILocate}
+            disabled={isAILocating}
+            className={`w-full sm:w-auto px-5 py-3 border rounded-xl transition-all font-medium disabled:opacity-50 flex items-center justify-center gap-2 ${btnColor}`}
+          >
+            {isAILocating ? (
+              <div className={`w-4 h-4 border-2 border-t-transparent rounded-full animate-spin ${spinnerColor}`}></div>
+            ) : (
+              <>
+                <Sparkles className="w-5 h-5" /> AI Locate
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 relative z-10">

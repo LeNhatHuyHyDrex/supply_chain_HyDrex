@@ -7,6 +7,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useCartStore } from "@/store/useCartStore";
 import { MapPin, ShoppingCart, QrCode, Leaf, Search } from "lucide-react";
 import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
 
 interface StorefrontProps {
@@ -27,7 +28,7 @@ const cardVariants = {
   hidden: { opacity: 0, y: 30 },
   visible: (i: number) => ({
     opacity: 1, y: 0,
-    transition: { duration: 0.5, delay: i * 0.08, ease: [0.25, 0.46, 0.45, 0.94] },
+    transition: { duration: 0.5, delay: i * 0.08, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] },
   }),
 };
 
@@ -36,7 +37,10 @@ export default function Storefront({ onTrace }: StorefrontProps) {
   const [validBlockchainIds, setValidBlockchainIds] = useState<Set<string>>(new Set());
   const [templateByBlockchainId, setTemplateByBlockchainId] = useState<Record<string, TemplateInfo>>({});
   const [qrModal, setQrModal] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [qrBaseUrl, setQrBaseUrl] = useState<string>("");
   const { addToCart } = useCartStore();
+  const t = useTranslations("storefront");
 
   const { data: products, isLoading, isError, error } = useReadContract({
     address: CONTRACT_ADDRESS,
@@ -45,6 +49,14 @@ export default function Storefront({ onTrace }: StorefrontProps) {
   });
 
   useEffect(() => { if (isError && error) console.error("RPC Error:", error); }, [isError, error]);
+
+  // ── Fetch dynamic QR base URL (LAN IP) ───────────────────────────
+  useEffect(() => {
+    fetch("/api/qr-url")
+      .then(res => res.json())
+      .then(data => { if (data.baseUrl) setQrBaseUrl(data.baseUrl); })
+      .catch(() => { setQrBaseUrl(typeof window !== "undefined" ? window.location.origin : ""); });
+  }, []);
 
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -70,7 +82,7 @@ export default function Storefront({ onTrace }: StorefrontProps) {
   const handleAddToCart = (tmpl: TemplateInfo) => {
     if (!tmpl.price || tmpl.price <= 0) return;
     addToCart({ templateId: tmpl.id, name: tmpl.name, imageUrl: tmpl.imageUrl || null, origin: tmpl.origin, price: tmpl.price });
-    toast.success(`${tmpl.name} added to cart`);
+    toast.success(t("addedToCart", { name: tmpl.name }));
   };
 
   if (isLoading) {
@@ -84,8 +96,8 @@ export default function Storefront({ onTrace }: StorefrontProps) {
   if (isError) {
     return (
       <div className="glass-card p-8 text-center">
-        <p className="font-heading text-xl mb-2">Failed to load products</p>
-        <p className="text-sm text-[var(--muted)] font-body">Please check your network connection.</p>
+        <p className="font-heading text-xl mb-2">{t("failedTitle")}</p>
+        <p className="text-sm text-[var(--muted)] font-body">{t("failedDesc")}</p>
         <p className="text-xs font-mono mt-4 text-[var(--muted)] opacity-50 break-all">{error?.message || "Unknown error"}</p>
       </div>
     );
@@ -98,34 +110,71 @@ export default function Storefront({ onTrace }: StorefrontProps) {
 
   const safeProducts = allProducts.filter(p => validBlockchainIds.has(p.id));
 
+  // Client-side search filter
+  const q = searchQuery.toLowerCase().trim();
+  const filteredProducts = q
+    ? safeProducts.filter(p => {
+        const tmpl = templateByBlockchainId[p.id];
+        return p.name.toLowerCase().includes(q) || p.origin.toLowerCase().includes(q) || (tmpl?.name?.toLowerCase().includes(q)) || (tmpl?.origin?.toLowerCase().includes(q));
+      })
+    : safeProducts;
+
   if (safeProducts.length === 0) {
     return (
       <div className="glass-card p-12 text-center">
         <Leaf className="w-12 h-12 mx-auto mb-4 text-fruit-emerald/30" />
-        <h3 className="font-heading text-2xl mb-2">Product Catalog is Empty</h3>
-        <p className="text-[var(--muted)] font-body">No products with valid templates have been registered yet.</p>
+        <h3 className="font-heading text-2xl mb-2">{t("emptyTitle")}</h3>
+        <p className="text-[var(--muted)] font-body">{t("emptyDesc")}</p>
       </div>
     );
   }
 
-  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+  const baseUrl = qrBaseUrl || (typeof window !== "undefined" ? window.location.origin : "");
 
   return (
     <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-heading text-3xl">Product Catalog</h2>
-          <p className="text-sm text-[var(--muted)] font-body mt-1">Farm-fresh produce, verified on-chain</p>
+          <h2 className="font-heading text-3xl">{t("title")}</h2>
+          <p className="text-sm text-[var(--muted)] font-body mt-1">{t("subtitle")}</p>
         </div>
         <span className="badge badge-success">
-          <Leaf className="w-3 h-3" /> {safeProducts.length} Products
+          <Leaf className="w-3 h-3" /> {safeProducts.length} {t("title")}
         </span>
       </div>
 
+      {/* Search Bar */}
+      <div className="relative">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-white/30 pointer-events-none" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder={t("title") === "Product Catalog" ? "Search products by name or origin..." : "Tìm kiếm sản phẩm theo tên hoặc xuất xứ..."}
+          className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-sm font-body text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/25 focus:outline-none focus:ring-2 focus:ring-fruit-emerald/30 focus:border-fruit-emerald/30 transition-all shadow-sm"
+        />
+        {searchQuery && (
+          <button onClick={() => setSearchQuery("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:text-white/30 dark:hover:text-white/60 transition-colors">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        )}
+      </div>
+
+      {/* No Results */}
+      {filteredProducts.length === 0 && q && (
+        <div className="text-center py-12">
+          <Search className="w-10 h-10 mx-auto mb-3 text-slate-300 dark:text-white/15" />
+          <p className="font-body text-sm text-slate-500 dark:text-white/40">
+            {t("title") === "Product Catalog" ? "No matching products found" : "Không tìm thấy sản phẩm phù hợp"}
+          </p>
+          <p className="text-xs text-slate-400 dark:text-white/20 mt-1 font-body">&ldquo;{searchQuery}&rdquo;</p>
+        </div>
+      )}
+
       {/* Product Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {safeProducts.map((product, i) => {
+        {filteredProducts.map((product, i) => {
           const id = product.id;
           const tmpl = templateByBlockchainId[id];
           const inv = tmpl?.inventory;
@@ -158,7 +207,7 @@ export default function Storefront({ onTrace }: StorefrontProps) {
                 {/* Status badge */}
                 <div className="absolute top-3 left-3">
                   <span className={isInStock ? "badge badge-success" : "badge badge-error"}>
-                    {isInStock ? `In Stock · ${totalStock}` : "Sold Out"}
+                    {isInStock ? `${t("inStock")} · ${totalStock}` : t("soldOut")}
                   </span>
                 </div>
 
@@ -185,12 +234,12 @@ export default function Storefront({ onTrace }: StorefrontProps) {
                 <div className="mt-auto pt-5 flex gap-2">
                   <button onClick={() => onTrace(id)}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold rounded-full bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/20 transition-colors">
-                    <Search className="w-3.5 h-3.5" /> Trace Origin
+                    <Search className="w-3.5 h-3.5" /> {t("traceOrigin")}
                   </button>
                   {canBuy && (
                     <button onClick={() => handleAddToCart(tmpl)}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold rounded-full bg-fruit-emerald text-white hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 transition-all">
-                      <ShoppingCart className="w-3.5 h-3.5" /> Add to Cart
+                      <ShoppingCart className="w-3.5 h-3.5" /> {t("addToCart")}
                     </button>
                   )}
                 </div>
@@ -201,20 +250,31 @@ export default function Storefront({ onTrace }: StorefrontProps) {
       </div>
 
       {/* ── QR Modal ──────────────────────────────────────────────────── */}
-      {qrModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[var(--overlay-bg)] backdrop-blur-sm"
-          onClick={() => setQrModal(null)}>
-          <div className="glass-card p-8 text-center max-w-xs" onClick={e => e.stopPropagation()} style={{ borderRadius: '1.5rem' }}>
-            <h3 className="font-heading text-xl mb-4">Product QR Code</h3>
-            <div className="p-4 bg-white rounded-2xl inline-block mx-auto shadow-lg">
-              <QRCodeSVG value={`${baseUrl}/?trace=${qrModal}`} size={180} level="H" fgColor="#059669" />
+      {qrModal && (() => {
+        const tmplInfo = templateByBlockchainId[qrModal];
+        const qrUrl = `${baseUrl}?batchId=${qrModal}`;
+        return (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-[var(--overlay-bg)] backdrop-blur-sm"
+            onClick={() => setQrModal(null)}>
+            <div className="glass-card p-8 text-center max-w-sm" onClick={e => e.stopPropagation()} style={{ borderRadius: '1.5rem' }}>
+              <h3 className="font-heading text-xl mb-1">{t("qrTitle")}</h3>
+              {tmplInfo && (
+                <p className="text-sm text-slate-600 dark:text-white/50 font-body mb-4">
+                  {tmplInfo.name} — {tmplInfo.origin}
+                </p>
+              )}
+              <div className="p-4 bg-white rounded-2xl inline-block mx-auto shadow-lg">
+                <QRCodeSVG value={qrUrl} size={200} level="H" fgColor="#059669" />
+              </div>
+              <p className="text-xs text-[var(--muted)] font-body mt-4">{t("qrDesc")}</p>
+              <p className="font-mono text-[10px] text-[var(--muted)] mt-2 break-all px-2 opacity-60">{qrUrl}</p>
+              <button onClick={() => setQrModal(null)} className="btn-ghost mt-4 w-full !text-sm">
+                {t("title") === "Product Catalog" ? "Close" : "Đóng"}
+              </button>
             </div>
-            <p className="text-xs text-[var(--muted)] font-body mt-4">Scan to trace this product&apos;s full journey</p>
-            <p className="font-mono text-xs text-[var(--muted)] mt-1">ID: {qrModal}</p>
-            <button onClick={() => setQrModal(null)} className="btn-ghost mt-4 w-full !text-sm">Close</button>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

@@ -7,26 +7,28 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/providers/UserProvider";
 import { useCartStore } from "@/store/useCartStore";
+import { useChangeLocale } from "@/providers/I18nProvider";
+import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
 import {
   Sun, Moon, ShoppingCart, ChevronDown, Menu, X, Copy, LogOut, User,
-  Store, Search, Package, ClipboardList, Sprout, Truck, Shield, BarChart3, Home,
+  Store, Search, Package, ClipboardList, Sprout, Truck, Shield, BarChart3, Home, Languages,
 } from "lucide-react";
 
 // ─── View Definitions ─────────────────────────────────────────────────────────
 export type ViewKey = "home" | "storefront" | "consumer" | "inventory" | "orders" | "producer" | "logistics" | "admin" | "dashboard";
 
-export interface NavItem { key: ViewKey; label: string; icon: React.ReactNode; access: string[]; desc: string; }
+export interface NavItem { key: ViewKey; labelKey: string; icon: React.ReactNode; access: string[]; descKey: string; }
 
 export const NAV_ITEMS: NavItem[] = [
-  { key: "storefront", label: "Shop",       icon: <Store className="w-4 h-4" />,         access: ["CUSTOMER","SHIPPER","SUPPLIER","ADMIN"], desc: "Browse products" },
-  { key: "consumer",   label: "Trace",      icon: <Search className="w-4 h-4" />,        access: ["CUSTOMER","SHIPPER","SUPPLIER","ADMIN"], desc: "Product traceability" },
-  { key: "inventory",  label: "Inventory",  icon: <Package className="w-4 h-4" />,       access: ["SUPPLIER","ADMIN"],                      desc: "Warehouse & stock" },
-  { key: "orders",     label: "Orders",     icon: <ClipboardList className="w-4 h-4" />, access: ["ADMIN","SUPPLIER"],                      desc: "Manage orders" },
-  { key: "producer",   label: "Producer",   icon: <Sprout className="w-4 h-4" />,        access: ["SUPPLIER","ADMIN"],                      desc: "Register products" },
-  { key: "logistics",  label: "Logistics",  icon: <Truck className="w-4 h-4" />,         access: ["SHIPPER","SUPPLIER","ADMIN"],             desc: "Update shipments" },
-  { key: "admin",      label: "Admin",      icon: <Shield className="w-4 h-4" />,        access: ["ADMIN"],                                 desc: "User management" },
-  { key: "dashboard",  label: "Analytics",  icon: <BarChart3 className="w-4 h-4" />,     access: ["ADMIN"],                                 desc: "Global overview" },
+  { key: "storefront", labelKey: "shop",       icon: <Store className="w-4 h-4" />,         access: ["CUSTOMER","SHIPPER","SUPPLIER","ADMIN"], descKey: "shopDesc" },
+  { key: "consumer",   labelKey: "trace",      icon: <Search className="w-4 h-4" />,        access: ["CUSTOMER","SHIPPER","SUPPLIER","ADMIN"], descKey: "traceDesc" },
+  { key: "inventory",  labelKey: "inventory",  icon: <Package className="w-4 h-4" />,       access: ["SUPPLIER","ADMIN"],                      descKey: "inventoryDesc" },
+  { key: "orders",     labelKey: "orders",     icon: <ClipboardList className="w-4 h-4" />, access: ["ADMIN","SUPPLIER"],                      descKey: "ordersDesc" },
+  { key: "producer",   labelKey: "producer",   icon: <Sprout className="w-4 h-4" />,        access: ["SUPPLIER","ADMIN"],                      descKey: "producerDesc" },
+  { key: "logistics",  labelKey: "logistics",  icon: <Truck className="w-4 h-4" />,         access: ["SHIPPER","SUPPLIER","ADMIN"],             descKey: "logisticsDesc" },
+  { key: "admin",      labelKey: "admin",      icon: <Shield className="w-4 h-4" />,        access: ["ADMIN"],                                 descKey: "adminDesc" },
+  { key: "dashboard",  labelKey: "analytics",  icon: <BarChart3 className="w-4 h-4" />,     access: ["ADMIN"],                                 descKey: "analyticsDesc" },
 ];
 
 // ─── LogoMark ─────────────────────────────────────────────────────────────────
@@ -39,12 +41,32 @@ function LogoMark({ className = "" }: { className?: string }) {
 // ─── Dropdown animation ───────────────────────────────────────────────────────
 const dropdownVariants = {
   hidden: { opacity: 0, scale: 0.95, y: -4 },
-  visible: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.15, ease: "easeOut" } },
-  exit: { opacity: 0, scale: 0.95, y: -4, transition: { duration: 0.1, ease: "easeIn" } },
+  visible: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.15, ease: "easeOut" as const } },
+  exit: { opacity: 0, scale: 0.95, y: -4, transition: { duration: 0.1, ease: "easeIn" as const } },
 };
 
 // ─── Truncate ─────────────────────────────────────────────────────────────────
 const truncAddr = (a: string) => a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "";
+
+// ─── Adaptive text color helper ───────────────────────────────────────────────
+const textColor = (isHero: boolean) => isHero ? "text-white drop-shadow-md" : "text-slate-700 dark:text-white";
+const iconColor = (isHero: boolean) => isHero ? "text-white drop-shadow-md" : "text-slate-600 dark:text-white";
+
+// ─── Language Toggle ──────────────────────────────────────────────────────────
+function LanguageToggle({ isHero }: { isHero: boolean }) {
+  const { locale, setLocale } = useChangeLocale();
+  const isVi = locale === "vi";
+  return (
+    <button
+      onClick={() => setLocale(isVi ? "en" : "vi")}
+      className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-gradient-to-br from-white/25 via-white/10 to-transparent dark:from-black/40 dark:via-black/20 dark:to-transparent backdrop-blur-[30px] border border-white/20 dark:border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] hover:bg-white/30 dark:hover:bg-white/10 hover:shadow-[0_0_24px_4px_rgba(16,185,129,0.3)] transition-all duration-200 hover:scale-[1.04] active:scale-[0.97]"
+      title={isVi ? "Switch to English" : "Chuyển sang Tiếng Việt"}
+    >
+      <Languages className={`w-3.5 h-3.5 ${iconColor(isHero)}`} />
+      <span className={`text-[11px] font-bold ${textColor(isHero)}`}>{isVi ? "VN" : "EN"}</span>
+    </button>
+  );
+}
 
 // ─── Theme Toggle ─────────────────────────────────────────────────────────────
 function ThemeToggle({ isHero }: { isHero: boolean }) {
@@ -57,7 +79,7 @@ function ThemeToggle({ isHero }: { isHero: boolean }) {
     <button onClick={() => setTheme(isDark ? "light" : "dark")}
       className="p-2 rounded-xl bg-gradient-to-br from-white/25 via-white/10 to-transparent dark:from-black/40 dark:via-black/20 dark:to-transparent backdrop-blur-[30px] border border-white/20 dark:border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] hover:bg-white/30 dark:hover:bg-white/10 hover:shadow-[0_0_24px_4px_rgba(16,185,129,0.3)] transition-all duration-200 hover:scale-[1.04] active:scale-[0.97]"
       title={isDark ? "Light Mode" : "Dark Mode"}>
-      {isDark ? <Sun className="w-4 h-4 text-yellow-400 drop-shadow-md" /> : <Moon className="w-4 h-4 text-white drop-shadow-md" />}
+      {isDark ? <Sun className="w-4 h-4 text-yellow-400 drop-shadow-md" /> : <Moon className={`w-4 h-4 ${iconColor(isHero)}`} />}
     </button>
   );
 }
@@ -67,6 +89,8 @@ function UserProfileDropdown({ isHero }: { isHero: boolean }) {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { user, refetchUser, requireOnboarding, setRequireOnboarding } = useUser();
+  const t = useTranslations("header");
+  const tOnboard = useTranslations("onboarding");
   const [open, setOpen] = useState(false);
   const [inputName, setInputName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -79,16 +103,16 @@ function UserProfileDropdown({ isHero }: { isHero: boolean }) {
     document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  const handleCopy = () => { if (address) { navigator.clipboard.writeText(address); toast.success("Address copied!"); } };
+  const handleCopy = () => { if (address) { navigator.clipboard.writeText(address); toast.success(tOnboard("nameSaved").includes("Display") ? "Address copied!" : "Đã sao chép!"); } };
 
   const handleSaveName = async () => {
-    if (!inputName.trim()) { toast.error("Please enter a display name"); return; }
+    if (!inputName.trim()) { toast.error(tOnboard("enterName")); return; }
     setSaving(true);
     try {
       const res = await fetch("/api/user", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ walletAddress: address, displayName: inputName.trim() }) });
-      if (res.ok) { await refetchUser(); toast.success("Display name saved!"); setRequireOnboarding(false); }
-      else toast.error("Error saving name");
-    } catch { toast.error("Error"); } finally { setSaving(false); }
+      if (res.ok) { await refetchUser(); toast.success(tOnboard("nameSaved")); setRequireOnboarding(false); }
+      else toast.error(tOnboard("errorSaving"));
+    } catch { toast.error(tOnboard("errorSaving")); } finally { setSaving(false); }
   };
 
   if (!mounted) return <div className="w-28 h-9" />;
@@ -105,17 +129,17 @@ function UserProfileDropdown({ isHero }: { isHero: boolean }) {
         <button onClick={() => setOpen(!open)}
           className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-br from-white/25 via-white/10 to-transparent dark:from-black/40 dark:via-black/20 dark:to-transparent backdrop-blur-[30px] border border-white/20 dark:border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] hover:bg-white/30 dark:hover:bg-white/10 hover:shadow-[0_0_24px_4px_rgba(16,185,129,0.3)] transition-all duration-200 hover:scale-[1.04] active:scale-[0.97]">
           {/* Avatar */}
-          <div className="w-6 h-6 rounded-full bg-white/20 border border-white/30 flex items-center justify-center shadow-[inset_0_1px_2px_rgba(255,255,255,0.3)]">
+          <div className="w-6 h-6 rounded-full bg-fruit-emerald/20 border border-fruit-emerald/30 flex items-center justify-center">
             {user?.displayName ? (
-              <span className="text-white drop-shadow-md text-[10px] font-bold">{user.displayName.charAt(0).toUpperCase()}</span>
+              <span className={`text-[10px] font-bold text-fruit-emerald`}>{user.displayName.charAt(0).toUpperCase()}</span>
             ) : (
-              <User className="w-3 h-3 text-white drop-shadow-md" />
+              <User className={`w-3 h-3 ${iconColor(isHero)}`} />
             )}
           </div>
-          <span className="text-xs font-mono text-white drop-shadow-md">
+          <span className={`text-xs font-mono ${textColor(isHero)}`}>
             {truncAddr(address || "")}
           </span>
-          <ChevronDown className={`w-3 h-3 text-white drop-shadow-md transition-transform ${open ? "rotate-180" : ""}`} />
+          <ChevronDown className={`w-3 h-3 ${iconColor(isHero)} transition-transform ${open ? "rotate-180" : ""}`} />
         </button>
 
         {/* ── Dropdown ─────────────────────────────────────────────── */}
@@ -134,7 +158,7 @@ function UserProfileDropdown({ isHero }: { isHero: boolean }) {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold font-body text-sm truncate">{user?.displayName || "Unknown User"}</p>
+                    <p className="font-semibold font-body text-sm truncate text-slate-900 dark:text-white">{user?.displayName || t("unknownUser")}</p>
                     <span className="badge badge-success !text-[9px]">{user?.role || "CUSTOMER"}</span>
                   </div>
                 </div>
@@ -151,12 +175,12 @@ function UserProfileDropdown({ isHero }: { isHero: boolean }) {
                 {requireOnboarding && (
                   <button onClick={() => { setOpen(false); setRequireOnboarding(true); }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-body text-fruit-emerald hover:bg-fruit-emerald/5 transition-colors">
-                    <User className="w-4 h-4" /> Set Display Name
+                    <User className="w-4 h-4" /> {t("setDisplayName")}
                   </button>
                 )}
                 <button onClick={() => { disconnect(); setOpen(false); }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-body text-red-500 hover:bg-red-500/5 transition-colors">
-                  <LogOut className="w-4 h-4" /> Disconnect Wallet
+                  <LogOut className="w-4 h-4" /> {t("disconnectWallet")}
                 </button>
               </div>
             </motion.div>
@@ -164,23 +188,23 @@ function UserProfileDropdown({ isHero }: { isHero: boolean }) {
         </AnimatePresence>
       </div>
 
-      {/* ── Onboarding Modal (kept as-is) ────────────────────────── */}
+      {/* ── Onboarding Modal ────────────────────────── */}
       {requireOnboarding && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 dark:bg-[var(--overlay-bg)] backdrop-blur-sm">
           <div className="bg-white dark:bg-[#0A0A0B]/90 backdrop-blur-[40px] border border-slate-200 dark:border-white/10 shadow-2xl p-8 w-full max-w-md" style={{ borderRadius: "1.5rem" }}>
-            <h2 className="font-heading text-2xl text-slate-900 dark:text-white mb-2">Welcome</h2>
+            <h2 className="font-heading text-2xl text-slate-900 dark:text-white mb-2">{tOnboard("welcome")}</h2>
             <p className="text-slate-500 dark:text-[var(--muted)] mb-6 text-sm font-body">
-              Please enter a Display Name for your wallet. This will be visible when you update product statuses.
+              {tOnboard("enterDisplayName")}
             </p>
             <div className="mb-6">
-              <label className="block text-xs text-slate-500 dark:text-[var(--muted)] mb-1.5 uppercase tracking-wider font-body">Display Name</label>
-              <input type="text" value={inputName} onChange={e => setInputName(e.target.value)} placeholder="e.g. Huy - Admin"
+              <label className="block text-xs text-slate-500 dark:text-[var(--muted)] mb-1.5 uppercase tracking-wider font-body">{tOnboard("displayNameLabel")}</label>
+              <input type="text" value={inputName} onChange={e => setInputName(e.target.value)} placeholder={tOnboard("displayNamePlaceholder")}
                 className="input-field !bg-slate-50 dark:!bg-black/20" autoFocus onKeyDown={e => { if (e.key === "Enter") handleSaveName(); }} />
             </div>
             <div className="flex justify-end gap-3">
-              <button onClick={() => setRequireOnboarding(false)} className="btn-ghost" disabled={saving}>Skip</button>
+              <button onClick={() => setRequireOnboarding(false)} className="btn-ghost" disabled={saving}>{tOnboard("skip")}</button>
               <button onClick={handleSaveName} disabled={saving || !inputName.trim()} className="btn-primary">
-                {saving ? "Saving..." : "Save Name"}
+                {saving ? tOnboard("saving") : tOnboard("saveName")}
               </button>
             </div>
           </div>
@@ -200,6 +224,7 @@ interface MasterHeaderProps {
 export default function MasterHeader({ activeView, onNavigate, isHeroMode }: MasterHeaderProps) {
   const { user } = useUser();
   const { toggleDrawer, totalItems } = useCartStore();
+  const t = useTranslations("nav");
   const [mounted, setMounted] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
@@ -214,28 +239,29 @@ export default function MasterHeader({ activeView, onNavigate, isHeroMode }: Mas
   const visibleItems = NAV_ITEMS.filter(i => i.access.includes(role));
   const cartCount = mounted ? totalItems() : 0;
   const activeItem = NAV_ITEMS.find(n => n.key === activeView);
+  const activeLabel = activeItem ? t(activeItem.labelKey) : t("modules");
 
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-      isHeroMode ? "bg-transparent border-b border-transparent" : "bg-white/80 dark:bg-black/40 backdrop-blur-[30px] border-b border-slate-200 dark:border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]"
+      isHeroMode ? "bg-transparent border-b border-transparent" : "bg-white/90 border-b border-slate-200/80 shadow-sm dark:bg-[#0A0A0B]/40 dark:border-white/10 dark:shadow-none backdrop-blur-[30px]"
     }`}>
       <div className="max-w-7xl mx-auto px-6">
         <div className={`flex items-center justify-between transition-all duration-300 ${isHeroMode ? "py-5" : "py-3"}`}>
           {/* ── LEFT: Logo ───────────────────────────────────────── */}
           <button onClick={() => onNavigate("home")} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity group">
             <LogoMark className="w-8 h-8 group-hover:scale-105 transition-transform" />
-            <span className="font-heading text-lg tracking-tight text-white drop-shadow-md">VKU Market</span>
+            <span className={`font-heading text-lg tracking-tight ${textColor(isHeroMode)}`}>VKU Market</span>
           </button>
 
-          {/* ── MIDDLE: Nav Dropdown (replaces horizontal tabs) ─── */}
+          {/* ── MIDDLE: Nav Dropdown ─── */}
           <div className="relative" ref={navRef}>
             <button onClick={() => setNavOpen(!navOpen)}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-br from-white/25 via-white/10 to-transparent dark:from-black/40 dark:via-black/20 dark:to-transparent backdrop-blur-[30px] border border-white/20 dark:border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] hover:bg-white/30 dark:hover:bg-white/10 hover:shadow-[0_0_24px_4px_rgba(16,185,129,0.3)] transition-all duration-200 hover:scale-[1.04] active:scale-[0.97]">
-              {navOpen ? <X className="w-4 h-4 text-white drop-shadow-md" /> : <Menu className="w-4 h-4 text-white drop-shadow-md" />}
-              <span className="text-sm font-heading text-white drop-shadow-md hidden sm:inline">
-                {activeItem ? activeItem.label : "Modules"}
+              {navOpen ? <X className={`w-4 h-4 ${iconColor(isHeroMode)}`} /> : <Menu className={`w-4 h-4 ${iconColor(isHeroMode)}`} />}
+              <span className={`text-sm font-heading ${textColor(isHeroMode)} hidden sm:inline`}>
+                {activeLabel}
               </span>
-              <ChevronDown className={`w-3 h-3 text-white drop-shadow-md transition-transform ${navOpen ? "rotate-180" : ""}`} />
+              <ChevronDown className={`w-3 h-3 ${iconColor(isHeroMode)} transition-transform ${navOpen ? "rotate-180" : ""}`} />
             </button>
 
             <AnimatePresence>
@@ -251,8 +277,8 @@ export default function MasterHeader({ activeView, onNavigate, isHeroMode }: Mas
                       <Home className="w-4 h-4" />
                     </div>
                     <div className="text-left transition-transform duration-300 group-hover:translate-x-1.5">
-                      <p className={`font-semibold text-sm ${activeView === "home" ? "text-white" : "text-gray-900 dark:text-white"}`}>Home</p>
-                      <p className={`text-xs ${activeView === "home" ? "text-emerald-100" : "text-gray-500 dark:text-gray-400"}`}>Landing page</p>
+                      <p className={`font-semibold text-sm ${activeView === "home" ? "text-white" : "text-gray-900 dark:text-white"}`}>{t("home")}</p>
+                      <p className={`text-xs ${activeView === "home" ? "text-emerald-100" : "text-gray-500 dark:text-gray-400"}`}>{t("homeDesc")}</p>
                     </div>
                   </button>
 
@@ -268,8 +294,8 @@ export default function MasterHeader({ activeView, onNavigate, isHeroMode }: Mas
                         {item.icon}
                       </div>
                       <div className="text-left transition-transform duration-300 group-hover:translate-x-1.5">
-                        <p className={`font-semibold text-sm ${activeView === item.key ? "text-white" : "text-gray-900 dark:text-white"}`}>{item.label}</p>
-                        <p className={`text-xs ${activeView === item.key ? "text-emerald-100" : "text-gray-500 dark:text-gray-400"}`}>{item.desc}</p>
+                        <p className={`font-semibold text-sm ${activeView === item.key ? "text-white" : "text-gray-900 dark:text-white"}`}>{t(item.labelKey)}</p>
+                        <p className={`text-xs ${activeView === item.key ? "text-emerald-100" : "text-gray-500 dark:text-gray-400"}`}>{t(item.descKey)}</p>
                       </div>
                     </button>
                   ))}
@@ -278,14 +304,15 @@ export default function MasterHeader({ activeView, onNavigate, isHeroMode }: Mas
             </AnimatePresence>
           </div>
 
-          {/* ── RIGHT: Theme + Cart + User ────────────────────────── */}
+          {/* ── RIGHT: Lang + Theme + Cart + User ────────────────────────── */}
           <div className="flex items-center gap-2">
+            <LanguageToggle isHero={isHeroMode} />
             <ThemeToggle isHero={isHeroMode} />
 
             {/* Cart */}
             <button onClick={toggleDrawer}
               className="relative p-2 rounded-xl bg-gradient-to-br from-white/25 via-white/10 to-transparent dark:from-black/40 dark:via-black/20 dark:to-transparent backdrop-blur-[30px] border border-white/20 dark:border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] hover:bg-white/30 dark:hover:bg-white/10 hover:shadow-[0_0_24px_4px_rgba(16,185,129,0.3)] transition-all duration-200 hover:scale-[1.04] active:scale-[0.97]">
-              <ShoppingCart className="w-4 h-4 text-white drop-shadow-md" />
+              <ShoppingCart className={`w-4 h-4 ${iconColor(isHeroMode)}`} />
               {cartCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-fruit-emerald text-white text-[9px] font-bold rounded-full flex items-center justify-center min-w-[18px] min-h-[18px] shadow-[0_0_10px_rgba(16,185,129,0.5)]">
                   {cartCount}

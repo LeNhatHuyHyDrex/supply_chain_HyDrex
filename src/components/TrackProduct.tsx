@@ -7,7 +7,9 @@ import { QRCodeSVG } from "qrcode.react";
 import dynamic from "next/dynamic";
 import QRScannerModal from "./QRScannerModal";
 import UpdaterName from "./UpdaterName";
+import AITraceChat from "./AITraceChat";
 import toast from "react-hot-toast";
+import { ArrowLeft } from "lucide-react";
 
 const MapTrace = dynamic(() => import("./MapTrace"), { ssr: false });
 
@@ -22,9 +24,9 @@ const truncateAddress = (address: string) => {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 };
 
-interface TrackProductProps { initialId?: string | null; }
+interface TrackProductProps { initialId?: string | null; isFocusMode?: boolean; onBack?: () => void; }
 
-export default function TrackProduct({ initialId }: TrackProductProps = {}) {
+export default function TrackProduct({ initialId, isFocusMode, onBack }: TrackProductProps = {}) {
   const [searchId, setSearchId] = useState(initialId || "");
   const [queryId, setQueryId] = useState<string | null>(initialId || null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -53,36 +55,44 @@ export default function TrackProduct({ initialId }: TrackProductProps = {}) {
   ] | undefined;
 
   return (
-    <div className="glass-card p-8">
+    <div className={`glass-card overflow-hidden mx-auto ${isFocusMode ? 'w-full min-h-screen rounded-none border-none p-4 md:p-6' : 'w-full max-w-2xl p-4 md:p-8 min-h-screen'}`}>
+      {isFocusMode && onBack && (
+        <button onClick={onBack} className="text-emerald-500 pb-6 font-bold flex items-center gap-2">
+          <ArrowLeft className="w-5 h-5"/> Về trang chủ
+        </button>
+      )}
       <h2 className="font-heading text-3xl mb-6">Traceability</h2>
 
-      <form onSubmit={handleSearch} className="flex gap-2 mb-8">
-        <input type="number" value={searchId} onChange={e => setSearchId(e.target.value)} placeholder="Enter Product ID..." className="input-field flex-1" />
-        <button type="button" onClick={() => setIsScannerOpen(true)} className="btn-ghost flex items-center gap-2 !px-4">
-          <span className="text-base">📷</span> Scan QR
-        </button>
-        <button type="submit" className="btn-primary">Trace</button>
+      <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-2 mb-8">
+        <input type="number" value={searchId} onChange={e => setSearchId(e.target.value)} placeholder="Enter Product ID..." className="input-field flex-1 w-full" />
+        <div className="flex gap-2 w-full md:w-auto">
+          <button type="button" onClick={() => setIsScannerOpen(true)} className="btn-ghost flex-1 md:flex-none flex items-center justify-center gap-2 !px-4">
+            <span className="text-base">📷</span> Scan QR
+          </button>
+          <button type="submit" className="btn-primary flex-1 md:flex-none">Trace</button>
+        </div>
       </form>
+
+      {/* ── AI Blockchain Assistant ────────────────────────── */}
+      <AITraceChat />
 
       {(isLoading || isFetching) && (
         <div className="flex justify-center items-center py-12"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white/20"></div></div>
       )}
 
       {isError && (
-        <div className="glass-stat p-4 rounded-xl text-center">
-          <p className="opacity-70 font-body text-sm">Product not found or error occurred while fetching.</p>
-        </div>
+        <div className="p-4 text-center text-red-500">Không tìm thấy thông tin lô hàng này.</div>
       )}
 
       {productData && productData[1] !== "" && (
         <div className="flex flex-col gap-8">
           <div className="flex flex-col md:flex-row gap-5">
             <div className="flex-1 flex flex-col gap-4">
-              <div className="w-full h-64 relative overflow-hidden rounded-xl bg-[var(--surface)] border border-[var(--border)] flex items-center justify-center">
+              <div className="w-full h-64 relative overflow-hidden rounded-2xl shadow-lg bg-[var(--surface)] border border-[var(--border)] flex items-center justify-center">
                 {imageUrl ? <img src={imageUrl} alt={productData[1]} className="w-full h-full object-cover" /> : <div className="text-[var(--muted)] opacity-30 text-4xl">📦</div>}
                 <div className="absolute top-3 right-3 badge">ID: {productData[0].toString()}</div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)]">
                   <p className="text-[10px] text-[var(--muted)] opacity-60 uppercase tracking-wider font-body">Name</p>
                   <p className="font-heading text-lg">{productData[1]}</p>
@@ -108,7 +118,7 @@ export default function TrackProduct({ initialId }: TrackProductProps = {}) {
           {inventoryData && (
             <div className="glass-stat p-4 rounded-xl">
               <h3 className="font-heading text-lg mb-3">Stock Status</h3>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 {[
                   { label: "Warehouse", val: inventoryData.inWarehouse },
                   { label: "On Display", val: inventoryData.onDisplay },
@@ -151,16 +161,16 @@ export default function TrackProduct({ initialId }: TrackProductProps = {}) {
                       <div className="space-y-1.5">
                         <div className="flex items-start gap-2">
                           <svg className="w-4 h-4 text-[var(--muted)] opacity-50 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                          <p className="text-sm opacity-80 font-body">{update.locationData}</p>
+                          <p className="text-sm opacity-80 font-body break-words overflow-hidden w-full">{update.locationData}</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <svg className="w-4 h-4 text-[var(--muted)] opacity-50 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                          <p className="text-xs text-[var(--muted)] font-body">Updater: <UpdaterName address={update.updater} /></p>
+                          <p className="text-xs text-[var(--muted)] font-body break-words overflow-hidden w-full">Updater: <UpdaterName address={update.updater} /></p>
                         </div>
                         {update.condition && (
-                          <div className="mt-2 p-2.5 bg-[var(--surface)] border border-[var(--border)] rounded-lg">
+                          <div className="mt-2 p-2.5 bg-[var(--surface)] border border-[var(--border)] rounded-lg w-full overflow-hidden">
                             <p className="text-[9px] text-[var(--muted)] opacity-50 mb-1 uppercase font-bold tracking-wider">Condition</p>
-                            <p className="text-sm text-[var(--muted)] italic font-body">&quot;{update.condition}&quot;</p>
+                            <p className="text-sm text-[var(--muted)] italic font-body break-words w-full">&quot;{update.condition}&quot;</p>
                           </div>
                         )}
                       </div>
@@ -174,7 +184,7 @@ export default function TrackProduct({ initialId }: TrackProductProps = {}) {
       )}
 
       {productData && productData[1] === "" && (
-        <div className="glass-stat p-4 rounded-xl text-center"><p className="text-[var(--muted)] font-body text-sm">No product exists with this ID.</p></div>
+        <div className="p-4 text-center text-red-500">Không tìm thấy thông tin lô hàng này.</div>
       )}
 
       {isScannerOpen && (

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Web3Provider } from "@/providers/Web3Provider";
 import { UserProvider } from "@/providers/UserProvider";
+import { I18nProvider } from "@/providers/I18nProvider";
 import { ThemeProvider } from "next-themes";
 
 export const metadata: Metadata = {
@@ -27,11 +28,13 @@ export default function RootLayout({
       </head>
       <body suppressHydrationWarning className="bg-slate-50 text-slate-900 dark:bg-[#0A0A0B] dark:text-white transition-colors duration-300">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <Web3Provider>
-            <UserProvider>
-              {children}
-            </UserProvider>
-          </Web3Provider>
+          <I18nProvider>
+            <Web3Provider>
+              <UserProvider>
+                {children}
+              </UserProvider>
+            </Web3Provider>
+          </I18nProvider>
         </ThemeProvider>
       </body>
     </html>

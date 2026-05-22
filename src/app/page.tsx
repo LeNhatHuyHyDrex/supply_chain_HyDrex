@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ChevronUp, Leaf, ShieldCheck, Truck, Globe, Package } from "lucide-react";
 import { Toaster } from "react-hot-toast";
+import { useTranslations } from "next-intl";
 import gsap from "gsap";
 
 // ─── App Shell Components ─────────────────────────────────────────────────────
@@ -18,30 +20,23 @@ import UpdateStatus from "@/components/UpdateStatus";
 import AdminPanel from "@/components/AdminPanel";
 import Dashboard from "@/components/Dashboard";
 import CartDrawer from "@/components/CartDrawer";
+import AILoveBox from "@/components/AILoveBox";
 import { useUser } from "@/providers/UserProvider";
 
 // ─── VIDEO SOURCE ─────────────────────────────────────────────────────────────
 const VIDEO_SRC =
   "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260511_080827_a9e5ad52-b6ee-4e79-b393-d936f179cfd7.mp4";
 
-// ─── FAQ DATA ─────────────────────────────────────────────────────────────────
-const FAQ_DATA = [
-  { q: "How does blockchain verify my fruit?", a: "Every product is registered on-chain with a unique ID. Each status update (harvest → transit → delivery) is an immutable transaction, giving you a tamper-proof record of origin and handling." },
-  { q: "What wallets do you support?", a: "We support MetaMask, Brave Wallet, Coinbase Wallet, and any WalletConnect-compatible wallet on the Ethereum Sepolia testnet." },
-  { q: "Is my data private?", a: "Only supply chain data is stored on-chain. Personal info like delivery addresses are stored in a secure database and never exposed to the blockchain." },
-  { q: "How does inventory automation work?", a: "When logistics marks a batch as 'Delivered', our system auto-updates warehouse stock. Staff can then move items to display shelves and record sales." },
-];
-
 // ─── Animation Variants ───────────────────────────────────────────────────────
 const viewTransition = {
   initial: { opacity: 0, y: 20, filter: "blur(6px)" },
-  animate: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] } },
-  exit: { opacity: 0, y: -10, filter: "blur(4px)", transition: { duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] } },
+  animate: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] } },
+  exit: { opacity: 0, y: -10, filter: "blur(4px)", transition: { duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] } },
 };
 
 const fadeUp = {
   hidden: { opacity: 0, y: 40 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] } },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] } },
 };
 
 // ─── BlurText ─────────────────────────────────────────────────────────────────
@@ -98,6 +93,16 @@ function HomeView({ onNavigate }: { onNavigate: (view: ViewKey) => void }) {
   const [framesReady, setFramesReady] = useState(false);
   const [heroVisible, setHeroVisible] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const t = useTranslations("home");
+  const tCommon = useTranslations("common");
+  const tNav = useTranslations("nav");
+
+  const FAQ_DATA = [
+    { q: t("faq1q"), a: t("faq1a") },
+    { q: t("faq2q"), a: t("faq2a") },
+    { q: t("faq3q"), a: t("faq3a") },
+    { q: t("faq4q"), a: t("faq4a") },
+  ];
 
   // Frame Capture
   useEffect(() => {
@@ -177,73 +182,72 @@ function HomeView({ onNavigate }: { onNavigate: (view: ViewKey) => void }) {
         <canvas ref={canvasRef}
           className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${framesReady ? "opacity-60" : "opacity-0"}`}
           style={{ objectFit: "cover" }} />
-        <div className="absolute inset-0 bg-white/90 dark:bg-transparent dark:bg-gradient-to-b dark:from-black/40 dark:via-black/20 dark:to-black/70 z-[1]" />
+        <div className="absolute inset-0 bg-white/60 dark:bg-transparent dark:bg-gradient-to-b dark:from-black/40 dark:via-black/20 dark:to-black/70 z-[1]" />
 
         <div className={`absolute inset-0 z-[5] flex flex-col items-center justify-center transition-all duration-1000 ${heroVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
           <h1 className="font-heading text-slate-900 dark:text-white text-center select-none" style={{ fontSize: "clamp(2rem, 5vw, 4.5rem)", lineHeight: 1.1, letterSpacing: "-0.03em" }}>
-            <BlurText text="Fresh From the Farm," /><br /><BlurText text="Verified on Chain" />
+            <BlurText text={t("heroTitle1")} /><br /><BlurText text={t("heroTitle2")} />
           </h1>
           <p className="text-slate-600 dark:text-white/50 text-lg md:text-xl mt-6 font-light tracking-wide max-w-xl text-center font-body">
-            Blockchain-Verified Fruit Marketplace
+            {t("heroSubtitle")}
           </p>
           <div className="flex items-center gap-4 mt-10">
             <button onClick={() => onNavigate("storefront")}
               className="px-8 py-3.5 bg-fruit-emerald text-white font-bold text-sm rounded-full shadow-2xl shadow-fruit-emerald/30 hover:shadow-fruit-emerald/50 transition-all hover:scale-105 active:scale-95">
-              Start Shopping
+              {t("startShopping")}
             </button>
             <button onClick={() => onNavigate("consumer")}
               className="px-8 py-3.5 text-slate-900 dark:text-white font-semibold text-sm hover:scale-105 transition-all bg-white/50 dark:bg-black/30 border border-slate-300 dark:border-white/10 rounded-full">
-              View Traceability
+              {t("viewTraceability")}
             </button>
           </div>
         </div>
 
         <div className={`absolute bottom-8 left-0 right-0 z-[5] px-8 flex items-end justify-between transition-all duration-1000 delay-500 ${heroVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}>
-          <p className="text-slate-500 dark:text-white/40 text-xs leading-relaxed font-body max-w-xs">Every fruit traced from farm to table.<br />Powered by Ethereum Smart Contracts.</p>
+          <p className="text-slate-500 dark:text-white/40 text-xs leading-relaxed font-body max-w-xs">{t("heroFooter")}<br />{t("heroFooter2")}</p>
           <div className="flex items-center gap-3 text-slate-500 dark:text-white/30 text-xs font-body">
-            <span className="flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5" /> Verified</span>
-            <span className="flex items-center gap-1"><Truck className="w-3.5 h-3.5" /> Tracked</span>
-            <span className="flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> Decentralized</span>
+            <span className="flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5" /> {tCommon("verified")}</span>
+            <span className="flex items-center gap-1"><Truck className="w-3.5 h-3.5" /> {tCommon("tracked")}</span>
+            <span className="flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> {tCommon("decentralized")}</span>
           </div>
         </div>
       </div>
 
-      {/* ═══ SECTION 2: WHY VKU MARKET? (Glowing Glass Cards on Fruit BG) ═══ */}
+      {/* ═══ SECTION 2: WHY VKU MARKET? ═══ */}
       <section className="relative overflow-hidden">
-        {/* Fruit background */}
         <div className="absolute inset-0 z-0">
           <img src="/background/Blackground2.jpg" alt="" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-white/90 dark:bg-black/80 backdrop-blur-sm dark:backdrop-blur-none" />
+          <div className="absolute inset-0 bg-white/70 dark:bg-black/80 backdrop-blur-sm dark:backdrop-blur-none" />
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 py-32">
           <motion.div className="text-center mb-20" initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}>
-            <span className="badge badge-success mb-4 inline-flex"><Leaf className="w-3 h-3" /> Why Choose Us</span>
-            <h2 className="font-heading text-4xl md:text-5xl tracking-tight text-slate-900 dark:text-white drop-shadow-lg">Why VKU Market?</h2>
+            <span className="badge badge-success mb-4 inline-flex"><Leaf className="w-3 h-3" /> {t("whyChooseUs")}</span>
+            <h2 className="font-heading text-4xl md:text-5xl tracking-tight text-slate-900 dark:text-white drop-shadow-lg">{t("whyTitle")}</h2>
             <p className="text-slate-600 dark:text-white/50 font-body mt-3 max-w-lg mx-auto">
-              Three pillars that make our blockchain marketplace stand apart from the rest.
+              {t("whySubtitle")}
             </p>
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <GlowingGlassCard
               icon={<ShieldCheck className="w-7 h-7" />}
-              title="On-Chain Traceability"
-              description="Every harvest is verified on the Sepolia blockchain. Immutable, transparent, and trustworthy — from the orchard to your table."
+              title={t("pillar1Title")}
+              description={t("pillar1Desc")}
               glowGradient="linear-gradient(137deg, #10B981 0%, #06b6d4 100%)"
               delay={0}
             />
             <GlowingGlassCard
               icon={<Leaf className="w-7 h-7" />}
-              title="Peak Freshness"
-              description="From farm to table in hours, not days. Our integrated logistics engine ensures every item arrives at peak ripeness."
+              title={t("pillar2Title")}
+              description={t("pillar2Desc")}
               glowGradient="linear-gradient(137deg, #F59E0B 0%, #F87171 100%)"
               delay={0.15}
             />
             <GlowingGlassCard
               icon={<Package className="w-7 h-7" />}
-              title="Smart Inventory"
-              description="Real-time stock syncing via automated smart contracts. Warehouse, shelf, and sales data — all connected on one dashboard."
+              title={t("pillar3Title")}
+              description={t("pillar3Desc")}
               glowGradient="linear-gradient(137deg, #8B5CF6 0%, #EC4899 100%)"
               delay={0.3}
             />
@@ -251,26 +255,30 @@ function HomeView({ onNavigate }: { onNavigate: (view: ViewKey) => void }) {
         </div>
       </section>
 
-      {/* ═══ SECTION 3: STOREFRONT (Scroll Reveal) ══════════════════════════ */}
+      {/* ═══ SECTION 3: STOREFRONT ══════════════════════════ */}
       <section className="relative w-full py-24 bg-cover bg-center bg-no-repeat bg-fixed" style={{ backgroundImage: "url('/background/Blackground4..jpg')" }}>
-        <div className="absolute inset-0 bg-white/95 dark:bg-[#0A0A0B]/70 backdrop-blur-[2px] z-0 transition-colors duration-500"></div>
+        <div className="absolute inset-0 bg-white/75 dark:bg-[#0A0A0B]/70 backdrop-blur-[2px] z-0 transition-colors duration-500"></div>
         <motion.div className="relative z-10 max-w-7xl mx-auto px-4 md:px-8" initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}>
           <div className="text-center mb-16">
-            <span className="badge badge-success mb-4 inline-flex"><Leaf className="w-3 h-3" /> Fresh Collection</span>
-            <h2 className="font-heading text-4xl md:text-5xl tracking-tight text-slate-900 dark:text-white">Product Catalog</h2>
+            <span className="badge badge-success mb-4 inline-flex"><Leaf className="w-3 h-3" /> {t("freshCollection")}</span>
+            <h2 className="font-heading text-4xl md:text-5xl tracking-tight text-slate-900 dark:text-white">{t("productCatalog")}</h2>
             <p className="text-slate-500 dark:text-slate-400 font-body mt-3 max-w-lg mx-auto">
-              Farm-fresh produce, verified on the Ethereum blockchain. Every item is traceable from origin to shelf.
+              {t("productCatalogDesc")}
             </p>
+          </div>
+          {/* AI Recommendation Box */}
+          <div className="mb-12">
+            <AILoveBox />
           </div>
           <Storefront onTrace={(id) => onNavigate("consumer")} />
         </motion.div>
       </section>
 
-      {/* ═══ SECTION 4: CTA + FAQ (on Fruit BG) ════════════════════════════ */}
+      {/* ═══ SECTION 4: CTA + FAQ ════════════════════════════ */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img src="/background/Blackground3.jpg" alt="" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-white/90 dark:bg-black/80 backdrop-blur-sm dark:backdrop-blur-none" />
+          <div className="absolute inset-0 bg-white/70 dark:bg-black/80 backdrop-blur-sm dark:backdrop-blur-none" />
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 py-24">
@@ -281,21 +289,21 @@ function HomeView({ onNavigate }: { onNavigate: (view: ViewKey) => void }) {
                 <div className="absolute inset-0 bg-white/80 dark:bg-black/50 z-0" />
                 <div className="relative z-10">
                   <h3 className="font-heading text-4xl text-slate-900 dark:text-white mb-4 leading-tight">
-                    Trace Every Step<br />Without Borders
+                    {t("ctaTitle1")}<br />{t("ctaTitle2")}
                   </h3>
                   <p className="text-slate-700 dark:text-white/70 font-body text-sm mb-8 max-w-sm">
-                    From Vietnamese orchards to your doorstep — every transaction is immutably recorded on the Ethereum blockchain.
+                    {t("ctaDesc")}
                   </p>
                   <button onClick={() => onNavigate("storefront")}
                     className="inline-flex px-8 py-3.5 bg-slate-900 text-white dark:bg-white dark:text-black font-bold text-sm rounded-full hover:scale-105 transition-all shadow-2xl">
-                    Start Shopping →
+                    {t("startShopping")} →
                   </button>
                 </div>
               </div>
 
               {/* FAQ */}
               <div className="flex flex-col justify-center">
-                <h3 className="font-heading text-3xl mb-6 text-slate-900 dark:text-white">Frequently Asked</h3>
+                <h3 className="font-heading text-3xl mb-6 text-slate-900 dark:text-white">{t("faqTitle")}</h3>
                 <div className="space-y-3">
                   {FAQ_DATA.map((item, i) => (
                     <FaqItem key={i} item={item} isOpen={openFaq === i} toggle={() => setOpenFaq(openFaq === i ? null : i)} />
@@ -314,29 +322,29 @@ function HomeView({ onNavigate }: { onNavigate: (view: ViewKey) => void }) {
             <div className="md:col-span-2">
               <div className="flex items-center gap-2.5 mb-4"><LogoMark className="w-8 h-8" /><span className="font-heading text-xl">VKU Market</span></div>
               <p className="text-sm text-[var(--muted)] font-body max-w-sm leading-relaxed">
-                Blockchain-verified fruit marketplace with real-time traceability and inventory management. Built for VKU — Vietnam-Korea University.
+                {t("footerDesc")}
               </p>
             </div>
             <div>
-              <h4 className="font-body font-bold text-xs uppercase tracking-wider text-[var(--muted)] mb-4">Platform</h4>
+              <h4 className="font-body font-bold text-xs uppercase tracking-wider text-[var(--muted)] mb-4">{t("footerPlatform")}</h4>
               <div className="space-y-2.5">
-                {([["Shop", "storefront"], ["Trace Products", "consumer"], ["Inventory", "inventory"], ["Orders", "orders"]] as [string, ViewKey][]).map(([label, view]) => (
-                  <button key={view} onClick={() => onNavigate(view)} className="block text-sm font-body hover:text-fruit-emerald transition-colors text-[var(--muted)]">{label}</button>
+                {([["shop", "storefront"], ["trace", "consumer"], ["inventory", "inventory"], ["orders", "orders"]] as [string, ViewKey][]).map(([labelKey, view]) => (
+                  <button key={view} onClick={() => onNavigate(view)} className="block text-sm font-body hover:text-fruit-emerald transition-colors text-[var(--muted)]">{tNav(labelKey)}</button>
                 ))}
               </div>
             </div>
             <div>
-              <h4 className="font-body font-bold text-xs uppercase tracking-wider text-[var(--muted)] mb-4">Technology</h4>
+              <h4 className="font-body font-bold text-xs uppercase tracking-wider text-[var(--muted)] mb-4">{t("footerTechnology")}</h4>
               <div className="space-y-2.5">
-                {["Ethereum Sepolia", "Next.js 16", "Wagmi + RainbowKit", "Prisma ORM"].map(t => (
-                  <p key={t} className="text-sm font-body text-[var(--muted)]">{t}</p>
+                {["Ethereum Sepolia", "Next.js 16", "Wagmi + RainbowKit", "Prisma ORM"].map(tech => (
+                  <p key={tech} className="text-sm font-body text-[var(--muted)]">{tech}</p>
                 ))}
               </div>
             </div>
           </div>
           <div className="pt-8 border-t border-[var(--border)]">
             <p className="text-xs text-[var(--muted)] font-body text-center leading-relaxed">
-              All rights reserved. © 2026. Designed and Developed by Lê Nhật Huy (23IT102) & Nguyễn Thị Thùy Tiến (23IT273) - Vietnam-Korea University (VKU). Contact: hydrex.129@gmail.com
+              {t("footerCopyright")}
             </p>
           </div>
         </div>
@@ -346,16 +354,71 @@ function HomeView({ onNavigate }: { onNavigate: (view: ViewKey) => void }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// DEEP-LINK LOADING OVERLAY (Frosted-glass spinner for QR scan entry)
+// ═══════════════════════════════════════════════════════════════════════════════
+function DeepLinkLoadingOverlay() {
+  return (
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-white/80 dark:bg-[#0A0A0B]/90 backdrop-blur-xl">
+      <div className="flex flex-col items-center gap-6">
+        <div className="relative w-16 h-16">
+          <div className="absolute inset-0 rounded-full border-[3px] border-fruit-emerald/20" />
+          <div className="absolute inset-0 rounded-full border-[3px] border-transparent border-t-fruit-emerald animate-spin" />
+        </div>
+        <div className="text-center">
+          <p className="font-heading text-lg text-slate-900 dark:text-white">Đang truy xuất nguồn gốc...</p>
+          <p className="text-sm text-slate-500 dark:text-white/40 font-body mt-1">Verifying blockchain provenance</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// URL QUERY HANDLER (Isolated to safely wrap in Suspense boundary)
+// ═══════════════════════════════════════════════════════════════════════════════
+function URLQueryHandler({ onTrack }: { onTrack: (id: string) => void }) {
+  const searchParams = useSearchParams();
+  const [deepLinkLoading, setDeepLinkLoading] = useState(false);
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    if (initialized.current) return;
+    if (!searchParams) return;
+    
+    const batchIdStr = searchParams.get('batchId');
+    if (batchIdStr) {
+      // 1. Cast to strict Number for Prisma/Smart Contract safety
+      const numericId = parseInt(batchIdStr, 10);
+      
+      if (!isNaN(numericId)) {
+        console.log("Valid QR ID found:", numericId);
+        initialized.current = true;
+        setDeepLinkLoading(true);
+        onTrack(numericId.toString());
+        
+        // 2. WIPE THE URL CLEAN immediately to prevent infinite re-renders
+        window.history.replaceState(null, '', window.location.pathname);
+        setTimeout(() => setDeepLinkLoading(false), 1500);
+      }
+    }
+  }, [searchParams, onTrack]);
+
+  if (deepLinkLoading) return <DeepLinkLoadingOverlay />;
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD WRAPPER
 // ═══════════════════════════════════════════════════════════════════════════════
 function DashboardShell({ children }: { children: React.ReactNode }) {
+  const t = useTranslations("home");
   return (
     <div className="min-h-[calc(100vh-72px)] pt-6 bg-slate-50 dark:bg-[#0A0A0B] transition-colors">
       <div className="max-w-6xl mx-auto px-6 pb-16">{children}</div>
       <footer className="border-t border-[var(--border)] transition-colors">
         <div className="max-w-7xl mx-auto px-6 py-6">
           <p className="text-xs text-[var(--muted)] font-body text-center leading-relaxed">
-            All rights reserved. © 2026. Designed and Developed by Lê Nhật Huy (23IT102) & Nguyễn Thị Thùy Tiến (23IT273) - Vietnam-Korea University (VKU). Contact: hydrex.129@gmail.com
+            {t("footerCopyright")}
           </p>
         </div>
       </footer>
@@ -364,13 +427,15 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// APP SHELL
+// APP SHELL (Inner — requires Suspense boundary from parent)
 // ═══════════════════════════════════════════════════════════════════════════════
-export default function AppShell() {
+function AppShellInner() {
   const [activeView, setActiveView] = useState<ViewKey>("home");
   const [trackId, setTrackId] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [isQRFocusMode, setIsQRFocusMode] = useState(false);
   const { user } = useUser();
+  const tDenied = useTranslations("accessDenied");
   const role = user?.role || "CUSTOMER";
 
   useEffect(() => {
@@ -405,10 +470,20 @@ export default function AppShell() {
         style: { background: "var(--card-bg)", color: "var(--foreground)", border: "1px solid var(--card-border)", backdropFilter: "blur(12px)", fontFamily: "'Inter', sans-serif" },
       }} />
 
-      <MasterHeader activeView={activeView} onNavigate={handleNavigate} isHeroMode={isHeroMode} />
-      {!isHeroMode && <div className="h-[72px]" />}
+      {/* Deep-link URL parameter processing securely wrapped in Suspense */}
+      <Suspense fallback={<div className="p-6 text-emerald-500 backdrop-blur-xl bg-white/10 rounded-2xl border border-white/20 shadow-xl">Đang thiết lập cổng kết nối phi tập trung...</div>}>
+        <URLQueryHandler onTrack={(id) => {
+          setTrackId(id);
+          setActiveView("consumer");
+          setIsQRFocusMode(true);
+        }} />
+      </Suspense>
 
-      <AnimatePresence mode="wait">
+      {!isQRFocusMode && <MasterHeader activeView={activeView} onNavigate={handleNavigate} isHeroMode={isHeroMode} />}
+      {!isQRFocusMode && !isHeroMode && <div className="h-[72px]" />}
+
+      <main className={`flex-1 ${isQRFocusMode ? 'p-0 m-0 w-full h-screen overflow-y-auto bg-slate-50 dark:bg-[#0A0A0B]' : 'w-full'}`}>
+        <AnimatePresence mode="wait">
         {activeView === "home" && (
           <motion.div key="home" {...viewTransition}><HomeView onNavigate={handleNavigate} /></motion.div>
         )}
@@ -416,7 +491,23 @@ export default function AppShell() {
           <motion.div key="storefront" {...viewTransition}><DashboardShell><Storefront onTrace={(id) => { setTrackId(id); handleNavigate("consumer"); }} /></DashboardShell></motion.div>
         )}
         {activeView === "consumer" && (
-          <motion.div key="consumer" {...viewTransition}><DashboardShell><TrackProduct initialId={trackId} /></DashboardShell></motion.div>
+          <motion.div key="consumer" {...viewTransition}>
+            {isQRFocusMode ? (
+              <TrackProduct 
+                initialId={trackId} 
+                isFocusMode={isQRFocusMode} 
+                onBack={() => { setIsQRFocusMode(false); setActiveView("home"); }} 
+              />
+            ) : (
+              <DashboardShell>
+                <TrackProduct 
+                  initialId={trackId} 
+                  isFocusMode={isQRFocusMode} 
+                  onBack={() => { setIsQRFocusMode(false); setActiveView("home"); }} 
+                />
+              </DashboardShell>
+            )}
+          </motion.div>
         )}
         {activeView === "inventory" && hasAccess("inventory") && (
           <motion.div key="inventory" {...viewTransition}><DashboardShell><InventoryManager /></DashboardShell></motion.div>
@@ -441,16 +532,28 @@ export default function AppShell() {
             <DashboardShell>
               <div className="glass-card p-12 text-center">
                 <div className="text-5xl mb-4">⛔</div>
-                <h3 className="font-heading text-2xl mb-2">Access Denied</h3>
-                <p className="text-[var(--muted)] font-body">You do not have the required permissions ({role}) to view this section.</p>
-                <button onClick={() => handleNavigate("home")} className="btn-primary mt-6">Back to Home</button>
+                <h3 className="font-heading text-2xl mb-2">{tDenied("title")}</h3>
+                <p className="text-[var(--muted)] font-body">{tDenied("message", { role })}</p>
+                <button onClick={() => handleNavigate("home")} className="btn-primary mt-6">{tDenied("backHome")}</button>
               </div>
             </DashboardShell>
           </motion.div>
         )}
       </AnimatePresence>
+      </main>
 
-      <CartDrawer />
+      {!isQRFocusMode && <CartDrawer />}
     </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUSPENSE-WRAPPED EXPORT (prevents useSearchParams hydration crash)
+// ═══════════════════════════════════════════════════════════════════════════════
+export default function AppShell() {
+  return (
+    <Suspense fallback={<div className="p-6 text-emerald-500 backdrop-blur-xl bg-white/10 rounded-2xl border border-white/20 shadow-xl fixed inset-0 m-auto w-max h-max">Đang thiết lập cổng kết nối phi tập trung...</div>}>
+      <AppShellInner />
+    </Suspense>
   );
 }
