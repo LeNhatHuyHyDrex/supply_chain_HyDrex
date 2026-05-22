@@ -119,6 +119,27 @@ export default function Storefront({ onTrace }: StorefrontProps) {
       })
     : safeProducts;
 
+  const productsWithStock = filteredProducts.map(p => {
+    const tmpl = templateByBlockchainId[p.id];
+    const inv = tmpl?.inventory;
+    const totalStock = inv ? (inv.inWarehouse + inv.onDisplay) : 0;
+    const sameNameProducts = filteredProducts.filter(fp => fp.name === p.name);
+    const numBatches = sameNameProducts.length || 1;
+    const stock = totalStock / numBatches;
+    return { ...p, stock };
+  });
+
+  const groupedProducts = productsWithStock.reduce((acc: any[], curr: any) => {
+    const existing = acc.find(item => item.name === curr.name);
+    if (existing) {
+      existing.totalStock += curr.stock; // Sum up the stock
+      existing.batches.push(curr);       // Keep track of batches if needed
+    } else {
+      acc.push({ ...curr, totalStock: curr.stock, batches: [curr] });
+    }
+    return acc;
+  }, []);
+
   if (safeProducts.length === 0) {
     return (
       <div className="glass-card p-12 text-center">
@@ -140,7 +161,7 @@ export default function Storefront({ onTrace }: StorefrontProps) {
           <p className="text-sm text-[var(--muted)] font-body mt-1">{t("subtitle")}</p>
         </div>
         <span className="badge badge-success">
-          <Leaf className="w-3 h-3" /> {safeProducts.length} {t("title")}
+          <Leaf className="w-3 h-3" /> {groupedProducts.length} {t("title")}
         </span>
       </div>
 
@@ -162,7 +183,7 @@ export default function Storefront({ onTrace }: StorefrontProps) {
       </div>
 
       {/* No Results */}
-      {filteredProducts.length === 0 && q && (
+      {groupedProducts.length === 0 && q && (
         <div className="text-center py-12">
           <Search className="w-10 h-10 mx-auto mb-3 text-slate-300 dark:text-white/15" />
           <p className="font-body text-sm text-slate-500 dark:text-white/40">
@@ -174,12 +195,12 @@ export default function Storefront({ onTrace }: StorefrontProps) {
 
       {/* Product Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProducts.map((product, i) => {
+        {groupedProducts.map((product, i) => {
           const id = product.id;
           const tmpl = templateByBlockchainId[id];
           const inv = tmpl?.inventory;
           const imageUrl = tmpl?.imageUrl || null;
-          const totalStock = inv ? (inv.inWarehouse + inv.onDisplay) : 0;
+          const totalStock = Math.round(product.totalStock);
           const isInStock = totalStock > 0;
           const hasPrice = tmpl?.price && tmpl.price > 0;
           const canBuy = isInStock && hasPrice;
