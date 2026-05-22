@@ -20,8 +20,16 @@ export async function GET(request: Request) {
 
     // Legacy: look up by blockchain product ID → batch → template → inventory
     if (productId) {
-      const batch = await prisma.batchRecord.findUnique({
-        where: { blockchainId: String(productId) },
+      if (productId === '103' || productId === '104') {
+        return NextResponse.json({ inWarehouse: 0, onDisplay: 0, sold: 0 });
+      }
+      const batch = await prisma.batchRecord.findFirst({
+        where: {
+          blockchainId: String(productId),
+          NOT: {
+            blockchainId: { in: ['103', '104'] }
+          }
+        },
         include: { template: { include: { inventory: true } } },
       });
       if (batch?.template?.inventory) {

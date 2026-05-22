@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useReadContract } from "wagmi";
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from "@/config/contract";
 import { QRCodeSVG } from "qrcode.react";
@@ -9,9 +9,11 @@ import { MapPin, ShoppingCart, QrCode, Leaf, Search } from "lucide-react";
 import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
+import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 
 interface StorefrontProps {
-  onTrace: (id: string) => void;
+  onTrace?: (id: string) => void;
 }
 
 interface TemplateInfo {
@@ -33,12 +35,10 @@ const cardVariants = {
 };
 
 export default function Storefront({ onTrace }: StorefrontProps) {
-  const [templates, setTemplates] = useState<TemplateInfo[]>([]);
-  const [validBlockchainIds, setValidBlockchainIds] = useState<Set<string>>(new Set());
-  const [templateByBlockchainId, setTemplateByBlockchainId] = useState<Record<string, TemplateInfo>>({});
+  const router = useRouter();
   const [qrModal, setQrModal] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [qrBaseUrl, setQrBaseUrl] = useState<string>("");
+  const [visibleCount, setVisibleCount] = useState(6);
   const { addToCart } = useCartStore();
   const t = useTranslations("storefront");
 
@@ -50,31 +50,106 @@ export default function Storefront({ onTrace }: StorefrontProps) {
 
   useEffect(() => { if (isError && error) console.error("RPC Error:", error); }, [isError, error]);
 
-  // ── Fetch dynamic QR base URL (LAN IP) ───────────────────────────
+  // Reset pagination when search query changes
   useEffect(() => {
-    fetch("/api/qr-url")
-      .then(res => res.json())
-      .then(data => { if (data.baseUrl) setQrBaseUrl(data.baseUrl); })
-      .catch(() => { setQrBaseUrl(typeof window !== "undefined" ? window.location.origin : ""); });
-  }, []);
+    setVisibleCount(6);
+  }, [searchQuery]);
 
-  useEffect(() => {
-    const fetchTemplates = async () => {
-      try {
-        const res = await fetch("/api/templates");
-        if (res.ok) {
-          const data: TemplateInfo[] = await res.json();
-          setTemplates(data);
-          const idSet = new Set<string>();
-          const lookup: Record<string, TemplateInfo> = {};
-          data.forEach(t => { t.batches.forEach(b => { idSet.add(b.blockchainId); lookup[b.blockchainId] = t; }); });
-          setValidBlockchainIds(idSet);
-          setTemplateByBlockchainId(lookup);
-        }
-      } catch (error) { console.error("Failed to fetch templates:", error); }
-    };
-    fetchTemplates();
-  }, []);
+  // ── Fetch dynamic QR base URL (LAN IP) with React Query ──────────
+  const { data: qrUrlData } = useQuery<{ baseUrl: string }>({
+    queryKey: ["qr-url"],
+    queryFn: async () => {
+      const res = await fetch("/api/qr-url");
+      if (!res.ok) throw new Error("Failed to fetch QR base URL");
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // ── Fetch product templates with React Query ──────────────────────
+  const { data: templates } = useQuery<TemplateInfo[]>({
+    queryKey: ["templates"],
+    queryFn: async () => {
+      const res = await fetch("/api/templates");
+      if (!res.ok) throw new Error("Failed to fetch templates");
+      return res.json();
+    },
+    staleTime: 60 * 1000,
+  });
+
+  // ── Memoized Lookups ──────────────────────────────────────────────
+  const { validBlockchainIds, templateByBlockchainId } = useMemo(() => {
+    const idSet = new Set<string>();
+    const lookup: Record<string, TemplateInfo> = {};
+    if (templates) {
+      templates.forEach(t => {
+        t.batches.forEach(b => {
+          idSet.add(b.blockchainId);
+          lookup[b.blockchainId] = t;
+        });
+      });
+    }
+    return { validBlockchainIds: idSet, templateByBlockchainId: lookup };
+  }, [templates]);
+
+  const allProducts = useMemo(() => {
+    if (!products) return [];
+    return (products as any[]).map(p => ({
+      id: p.id.toString(),
+      name: p.name,
+      origin: p.origin,
+      history: (p.history || []).map((h: any) => ({
+        status: Number(h.status),
+        timestamp: h.timestamp.toString(),
+      })),
+    }));
+  }, [products]);
+
+  const safeProducts = useMemo(() => {
+    return allProducts.filter(p => validBlockchainIds.has(p.id));
+  }, [allProducts, validBlockchainIds]);
+
+  const filteredProducts = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return safeProducts;
+    return safeProducts.filter(p => {
+      const tmpl = templateByBlockchainId[p.id];
+      return p.name.toLowerCase().includes(q) ||
+             p.origin.toLowerCase().includes(q) ||
+             (tmpl?.name?.toLowerCase().includes(q)) ||
+             (tmpl?.origin?.toLowerCase().includes(q));
+    });
+  }, [safeProducts, searchQuery, templateByBlockchainId]);
+
+  const productsWithStock = useMemo(() => {
+    return filteredProducts.map(p => {
+      const tmpl = templateByBlockchainId[p.id];
+      const inv = tmpl?.inventory;
+      const totalStock = inv ? (inv.inWarehouse + inv.onDisplay) : 0;
+      const sameNameProducts = filteredProducts.filter(fp => fp.name === p.name && fp.origin === p.origin);
+      const numBatches = sameNameProducts.length || 1;
+      const stock = totalStock / numBatches;
+      return { ...p, stock };
+    });
+  }, [filteredProducts, templateByBlockchainId]);
+
+  // Group by name AND origin so that products of different origins appear as distinct cards
+  const groupedProducts = useMemo(() => {
+    return productsWithStock.reduce((acc: any[], curr: any) => {
+      const existing = acc.find(item => item.name === curr.name && item.origin === curr.origin);
+      if (existing) {
+        existing.totalStock += curr.stock;
+        existing.batches.push(curr);
+      } else {
+        acc.push({ ...curr, totalStock: curr.stock, batches: [curr] });
+      }
+      return acc;
+    }, []);
+  }, [productsWithStock]);
+
+  const displayedProducts = useMemo(() => {
+    return groupedProducts.slice(0, visibleCount);
+  }, [groupedProducts, visibleCount]);
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount);
@@ -83,6 +158,17 @@ export default function Storefront({ onTrace }: StorefrontProps) {
     if (!tmpl.price || tmpl.price <= 0) return;
     addToCart({ templateId: tmpl.id, name: tmpl.name, imageUrl: tmpl.imageUrl || null, origin: tmpl.origin, price: tmpl.price });
     toast.success(t("addedToCart", { name: tmpl.name }));
+  };
+
+  const handleTrack = (product: any) => {
+    // Sort batches descending by numerical blockchain ID to find the latest
+    const sortedBatches = [...product.batches].sort((a, b) => Number(b.id) - Number(a.id));
+    const latestBatchId = sortedBatches[0]?.id || product.id;
+
+    if (onTrace) {
+      onTrace(latestBatchId);
+    }
+    router.push(`/tracking?batchId=${latestBatchId}`);
   };
 
   if (isLoading) {
@@ -103,43 +189,6 @@ export default function Storefront({ onTrace }: StorefrontProps) {
     );
   }
 
-  const allProducts = products ? (products as any[]).map(p => ({
-    id: p.id.toString(), name: p.name, origin: p.origin,
-    history: (p.history || []).map((h: any) => ({ status: Number(h.status), timestamp: h.timestamp.toString() }))
-  })) : [];
-
-  const safeProducts = allProducts.filter(p => validBlockchainIds.has(p.id));
-
-  // Client-side search filter
-  const q = searchQuery.toLowerCase().trim();
-  const filteredProducts = q
-    ? safeProducts.filter(p => {
-        const tmpl = templateByBlockchainId[p.id];
-        return p.name.toLowerCase().includes(q) || p.origin.toLowerCase().includes(q) || (tmpl?.name?.toLowerCase().includes(q)) || (tmpl?.origin?.toLowerCase().includes(q));
-      })
-    : safeProducts;
-
-  const productsWithStock = filteredProducts.map(p => {
-    const tmpl = templateByBlockchainId[p.id];
-    const inv = tmpl?.inventory;
-    const totalStock = inv ? (inv.inWarehouse + inv.onDisplay) : 0;
-    const sameNameProducts = filteredProducts.filter(fp => fp.name === p.name);
-    const numBatches = sameNameProducts.length || 1;
-    const stock = totalStock / numBatches;
-    return { ...p, stock };
-  });
-
-  const groupedProducts = productsWithStock.reduce((acc: any[], curr: any) => {
-    const existing = acc.find(item => item.name === curr.name);
-    if (existing) {
-      existing.totalStock += curr.stock; // Sum up the stock
-      existing.batches.push(curr);       // Keep track of batches if needed
-    } else {
-      acc.push({ ...curr, totalStock: curr.stock, batches: [curr] });
-    }
-    return acc;
-  }, []);
-
   if (safeProducts.length === 0) {
     return (
       <div className="glass-card p-12 text-center">
@@ -150,7 +199,8 @@ export default function Storefront({ onTrace }: StorefrontProps) {
     );
   }
 
-  const baseUrl = qrBaseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+  const baseUrl = qrUrlData?.baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
+  const q = searchQuery.toLowerCase().trim();
 
   return (
     <div className="space-y-8">
@@ -195,10 +245,9 @@ export default function Storefront({ onTrace }: StorefrontProps) {
 
       {/* Product Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {groupedProducts.map((product, i) => {
+        {displayedProducts.map((product, i) => {
           const id = product.id;
           const tmpl = templateByBlockchainId[id];
-          const inv = tmpl?.inventory;
           const imageUrl = tmpl?.imageUrl || null;
           const totalStock = Math.round(product.totalStock);
           const isInStock = totalStock > 0;
@@ -253,7 +302,7 @@ export default function Storefront({ onTrace }: StorefrontProps) {
 
                 {/* Actions */}
                 <div className="mt-auto pt-5 flex gap-2">
-                  <button onClick={() => onTrace(id)}
+                  <button onClick={() => handleTrack(product)}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold rounded-full bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/20 transition-colors">
                     <Search className="w-3.5 h-3.5" /> {t("traceOrigin")}
                   </button>
@@ -269,6 +318,18 @@ export default function Storefront({ onTrace }: StorefrontProps) {
           );
         })}
       </div>
+
+      {/* Load More Button */}
+      {visibleCount < groupedProducts.length && (
+        <div className="flex justify-center pt-8">
+          <button
+            onClick={() => setVisibleCount(prev => prev + 6)}
+            className="btn-primary flex items-center gap-2 !px-8 !py-3 shadow-lg shadow-emerald-500/20 hover:scale-105 transition-transform"
+          >
+            <span>🔄</span> Load More Products
+          </button>
+        </div>
+      )}
 
       {/* ── QR Modal ──────────────────────────────────────────────────── */}
       {qrModal && (() => {

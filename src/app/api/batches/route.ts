@@ -53,7 +53,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const templateId = searchParams.get('templateId');
 
-    const where = templateId ? { templateId } : {};
+    const where: any = templateId
+      ? { templateId, blockchainId: { notIn: ['103', '104'] } }
+      : { blockchainId: { notIn: ['103', '104'] } };
     const batches = await prisma.batchRecord.findMany({
       where,
       include: { template: true },

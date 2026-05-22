@@ -20,7 +20,12 @@ export async function GET(request: Request) {
       },
       include: {
         inventory: true,
-        batches: { select: { blockchainId: true } },
+        batches: {
+          where: {
+            blockchainId: { notIn: ['103', '104'] }
+          },
+          select: { blockchainId: true }
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: 20,

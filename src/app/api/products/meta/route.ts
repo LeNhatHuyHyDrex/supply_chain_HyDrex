@@ -7,12 +7,19 @@ export async function GET(request: Request) {
 
   try {
     if (productId) {
+      if (productId === '103' || productId === '104') {
+        return NextResponse.json(null);
+      }
       const meta = await prisma.productMeta.findUnique({
         where: { productId }
       });
       return NextResponse.json(meta);
     } else {
-      const metas = await prisma.productMeta.findMany();
+      const metas = await prisma.productMeta.findMany({
+        where: {
+          productId: { notIn: ['103', '104'] }
+        }
+      });
       return NextResponse.json(metas);
     }
   } catch (error) {

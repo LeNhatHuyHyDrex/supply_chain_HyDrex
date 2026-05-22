@@ -94,7 +94,12 @@ export async function POST(request: Request) {
       if (ids.length > 0) {
         // Direct lookup by blockchain ID
         batchData = await prisma.batchRecord.findMany({
-          where: { blockchainId: { in: ids } },
+          where: {
+            blockchainId: {
+              in: ids,
+              notIn: ['103', '104'],
+            }
+          },
           include: {
             template: {
               include: { inventory: true },
@@ -110,7 +115,12 @@ export async function POST(request: Request) {
         }));
 
         batchData = await prisma.batchRecord.findMany({
-          where: { OR: keywordConditions },
+          where: {
+            AND: [
+              { OR: keywordConditions },
+              { blockchainId: { notIn: ['103', '104'] } }
+            ]
+          },
           include: {
             template: {
               include: { inventory: true },
@@ -122,6 +132,9 @@ export async function POST(request: Request) {
       // If still nothing found, provide a summary of all available batches (metadata only)
       if (batchData.length === 0 && ids.length === 0 && keywords.length === 0) {
         batchData = await prisma.batchRecord.findMany({
+          where: {
+            blockchainId: { notIn: ['103', '104'] }
+          },
           include: {
             template: {
               include: { inventory: true },

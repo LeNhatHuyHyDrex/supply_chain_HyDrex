@@ -7,7 +7,11 @@ export async function GET() {
     const templates = await prisma.productTemplate.findMany({
       include: {
         inventory: true,
-        batches: true,
+        batches: {
+          where: {
+            blockchainId: { notIn: ['103', '104'] }
+          }
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -81,7 +85,13 @@ export async function PATCH(request: Request) {
     const template = await prisma.productTemplate.update({
       where: { id: templateId },
       data: updateData,
-      include: { batches: true },
+      include: {
+        batches: {
+          where: {
+            blockchainId: { notIn: ['103', '104'] }
+          }
+        }
+      },
     });
 
     // If image was updated, also update all linked ProductMeta entries

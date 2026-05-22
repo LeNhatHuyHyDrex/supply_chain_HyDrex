@@ -10,6 +10,7 @@ import UpdaterName from "./UpdaterName";
 import AITraceChat from "./AITraceChat";
 import toast from "react-hot-toast";
 import { ArrowLeft } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 const MapTrace = dynamic(() => import("./MapTrace"), { ssr: false });
 
@@ -30,17 +31,50 @@ export default function TrackProduct({ initialId, isFocusMode, onBack }: TrackPr
   const [searchId, setSearchId] = useState(initialId || "");
   const [queryId, setQueryId] = useState<string | null>(initialId || null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [inventoryData, setInventoryData] = useState<{ inWarehouse: number; onDisplay: number; sold: number } | null>(null);
+
+  const { data: templates } = useQuery<any[]>({
+    queryKey: ["templates"],
+    queryFn: async () => {
+      const res = await fetch("/api/templates");
+      if (!res.ok) throw new Error("Failed to fetch templates");
+      return res.json();
+    },
+    staleTime: 60 * 1000,
+  });
+
+  const { data: metaData } = useQuery<any>({
+    queryKey: ["productMeta", queryId],
+    queryFn: async () => {
+      if (!queryId) return null;
+      const res = await fetch(`/api/products/meta?productId=${queryId}`);
+      if (!res.ok) throw new Error("Failed to fetch product meta");
+      return res.json();
+    },
+    enabled: !!queryId,
+    staleTime: 60 * 1000,
+  });
+
+  const { data: inventoryData } = useQuery<any>({
+    queryKey: ["inventory", queryId],
+    queryFn: async () => {
+      if (!queryId) return null;
+      const res = await fetch(`/api/inventory?productId=${queryId}`);
+      if (!res.ok) throw new Error("Failed to fetch inventory");
+      return res.json();
+    },
+    enabled: !!queryId,
+    staleTime: 60 * 1000,
+  });
 
   useEffect(() => { if (initialId) { setSearchId(initialId); setQueryId(initialId); } }, [initialId]);
 
-  useEffect(() => {
-    if (queryId) {
-      fetch(`/api/products/meta?productId=${queryId}`).then(res => res.json()).then(data => setImageUrl(data?.imageUrl || null)).catch(err => console.error("Error fetching image:", err));
-      fetch(`/api/inventory?productId=${queryId}`).then(res => res.json()).then(data => setInventoryData(data)).catch(err => console.error("Error fetching inventory:", err));
-    }
-  }, [queryId]);
+  const imageUrl = metaData?.imageUrl || null;
+
+  const activeTemplate = templates?.find((t: any) =>
+    t.batches?.some((b: any) => b.blockchainId === queryId)
+  );
+
+  const siblingBatches = activeTemplate?.batches || [];
 
   const { data, isError, isLoading, isFetching } = useReadContract({
     address: CONTRACT_ADDRESS, abi: CONTRACT_ABI, functionName: "getProduct",
@@ -78,6 +112,40 @@ export default function TrackProduct({ initialId, isFocusMode, onBack }: TrackPr
 
       {/* ── AI Blockchain Assistant ────────────────────────── */}
       <AITraceChat />
+
+      {/* ── Batch Selection Dropdown ────────────────────────── */}
+      {siblingBatches.length > 0 && (
+        <div className="my-6 p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
+          <label className="block text-xs font-bold uppercase tracking-wider text-[var(--muted)] opacity-80 mb-2.5 flex items-center gap-1.5">
+            <span>📦</span> Batch Selection
+          </label>
+          <div className="relative">
+            <select
+              value={queryId || ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSearchId(val);
+                setQueryId(val);
+                if (typeof window !== 'undefined') {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set("batchId", val);
+                  window.history.pushState({}, '', url.pathname + url.search);
+                }
+              }}
+              className="input-field w-full cursor-pointer appearance-none pr-10"
+            >
+              {siblingBatches.map((b: any) => (
+                <option key={b.blockchainId} value={b.blockchainId} className="bg-slate-900 text-white">
+                  Batch {b.blockchainId} - {b.quantity}kg {b.blockchainId === queryId ? "★ Active" : ""}
+                </option>
+              ))}
+            </select>
+            <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-emerald-500 font-bold">
+              ▼
+            </div>
+          </div>
+        </div>
+      )}
 
       {(isLoading || isFetching) && (
         <div className="flex justify-center items-center py-12"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white/20"></div></div>
