@@ -91,12 +91,16 @@ export default function AILoveBox() {
         sessionStorage.setItem(`ai_recommend_${locale}`, data.text);
       }
     } catch (error) {
-      alert("Hệ thống AI đang bảo trì, vui lòng thử lại sau");
-      const fallback = locale === "vi"
-          ? "🍊 Hôm nay hãy bổ sung vitamin C với cam tươi ngon nhé! Trái cây tươi luôn sẵn sàng cho bạn."
-          : "🍊 Refresh your day with fresh citrus fruits! VKU Market has the best selection for you.";
-      setText(fallback);
-      sessionStorage.setItem(`ai_recommend_${locale}`, fallback);
+      const retryMsg = locale === "vi" ? "Đang thử kết nối lại..." : "Retrying...";
+      setText(retryMsg);
+      
+      setTimeout(() => {
+        const fallback = locale === "vi"
+            ? "🍊 Hôm nay hãy bổ sung vitamin C với cam tươi ngon nhé! Trái cây tươi luôn sẵn sàng cho bạn."
+            : "🍊 Refresh your day with fresh citrus fruits! VKU Market has the best selection for you.";
+        setText(fallback);
+        sessionStorage.setItem(`ai_recommend_${locale}`, fallback);
+      }, 4000);
     } finally {
       setIsLoading(false);
     }

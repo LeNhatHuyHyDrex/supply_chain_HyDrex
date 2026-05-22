@@ -161,6 +161,8 @@ body {
   box-shadow: 0 2px 12px rgba(5,150,105,0.25);
   cursor: pointer;
   border: none;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 .btn-primary:hover {
   background: linear-gradient(135deg, #047857, #059669);
@@ -188,6 +190,8 @@ body {
   font-size: 0.875rem;
   transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
   cursor: pointer;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 .btn-ghost:hover {
   background: var(--surface-hover);
@@ -439,4 +443,18 @@ canvas { image-rendering: auto; }
 /* ─── FOOTER ────────────────────────────────────────────────────────────────── */
 .footer-gradient {
   background: linear-gradient(180deg, var(--background) 0%, var(--background) 100%);
+}
+
+/* ─── PERFORMANCE LAYER & CONTAINMENT ───────────────────────────────────────── */
+.gpu-accelerated {
+  will-change: transform;
+  backface-visibility: hidden;
+  transform: translate3d(0, 0, 0);
+}
+
+.product-card {
+  contain: content;
+  will-change: transform;
+  backface-visibility: hidden;
+  transform: translate3d(0, 0, 0);
 }
