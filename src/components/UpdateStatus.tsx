@@ -57,6 +57,8 @@ export default function UpdateStatus() {
       await writeContractAsync({ address: CONTRACT_ADDRESS, abi: CONTRACT_ABI, functionName: "updateProductStatus", args: [BigInt(id), BigInt(status), location, scaledLat, scaledLng, condition] });
     } catch (error: any) {
       console.error("Blockchain Transaction Error:", error);
+      setSubmittedId(null); 
+      setSubmittedStatus(null);
 
       const errMsg = error?.message?.toLowerCase() || "";
 
@@ -67,9 +69,6 @@ export default function UpdateStatus() {
       } else {
         toast.error("Đã xảy ra lỗi khi tương tác với Blockchain. Vui lòng thử lại.");
       }
-    } finally {
-      setSubmittedId(null); 
-      setSubmittedStatus(null);
     }
   };
 

@@ -196,7 +196,7 @@ Quy tắc:
       method: "POST",
       headers,
       body: JSON.stringify({
-        model: "openrouter/free",
+        model: "deepseek/deepseek-v4-flash:free",
         messages: [
           { role: "system", content: systemInstruction },
           { role: "user", content: userQuery.trim() }

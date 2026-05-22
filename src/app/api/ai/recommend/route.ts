@@ -190,7 +190,7 @@ Write a short, friendly, and empathetic consulting paragraph (3-4 sentences). St
       method: "POST",
       headers,
       body: JSON.stringify({
-        model: "openrouter/free",
+        model: "deepseek/deepseek-v4-flash:free",
         messages: [{ role: "user", content: prompt }]
       })
     });

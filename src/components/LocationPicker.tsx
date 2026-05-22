@@ -99,11 +99,11 @@ export default function LocationPicker({
 
       // 2. Geocode with Nominatim
       const address = encodeURIComponent(normalized);
-      const url = `https://nominatim.openstreetmap.org/search?q=${address}&format=json&addressdetails=1&limit=1`;
+      const url = `https://nominatim.openstreetmap.org/search?q=${address}&format=json&limit=1`;
       
       console.log(`[Nominatim Request] Fetching from: ${url}`);
       const geoRes = await fetch(url, {
-        headers: { "User-Agent": "VKU-Market-Project-Dev (contact: your-email@gmail.com)" }
+        headers: { "User-Agent": "VKU-Market-App/1.0" }
       });
       
       const geoData = await geoRes.json();
@@ -114,6 +114,7 @@ export default function LocationPicker({
         setLongitude(geoData[0].lon);
         toast.success("Location normalized & found successfully!");
       } else {
+        alert("Không tìm thấy địa điểm.");
         toast.error("AI đã chuẩn hóa nhưng không tìm thấy tọa độ trên bản đồ.");
       }
     } catch (err) {
@@ -166,7 +167,7 @@ export default function LocationPicker({
           ) : (
             <span className="text-lg">📍</span>
           )}
-          {isLocating ? "Locating..." : "Auto-Locate"}
+          {isLocating ? "Locating..." : "Use GPS"}
         </button>
         <button
           type="button"
@@ -202,7 +203,7 @@ export default function LocationPicker({
               <div className={`w-4 h-4 border-2 border-t-transparent rounded-full animate-spin ${spinnerColor}`}></div>
             ) : (
               <>
-                <Search className="w-5 h-5" /> Get Coords
+                <Sparkles className="w-5 h-5" /> Auto-Locate
               </>
             )}
           </button>

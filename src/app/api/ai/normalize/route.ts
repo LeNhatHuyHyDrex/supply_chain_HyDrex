@@ -9,7 +9,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "locationName is required" }, { status: 400 });
     }
 
-    const aiPrompt = `You are a professional geocoding assistant. Convert the following colloquial location name into a precise, internationally recognized address format suitable for OpenStreetMap/Nominatim, including city and country. Return ONLY the normalized address string. Location: '${locationName}'`;
+    const aiPrompt = `Convert '${locationName}' into a formal address format: '[Name], [District], [City], Vietnam'. Only return the address string, no extra text.`;
 
     const apiKey = process.env.OPENROUTER_API_KEY || "";
     const headers = {
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       method: "POST",
       headers,
       body: JSON.stringify({
-        model: "openrouter/free",
+        model: "deepseek/deepseek-v4-flash:free",
         messages: [{ role: "user", content: aiPrompt }]
       })
     });
