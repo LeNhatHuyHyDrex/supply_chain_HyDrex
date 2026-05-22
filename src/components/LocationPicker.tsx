@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import toast from "react-hot-toast";
 import dynamic from "next/dynamic";
-import { Sparkles, Search } from "lucide-react";
+import { Sprout, Search } from "lucide-react";
 
 const LocationMapModal = dynamic(() => import("./LocationMapModal"), { ssr: false });
 
@@ -203,7 +203,7 @@ export default function LocationPicker({
               <div className={`w-4 h-4 border-2 border-t-transparent rounded-full animate-spin ${spinnerColor}`}></div>
             ) : (
               <>
-                <Sparkles className="w-5 h-5" /> Auto-Locate
+                <Sprout className="w-5 h-5" /> Auto-Locate
               </>
             )}
           </button>
